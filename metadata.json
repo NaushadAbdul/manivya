@@ -1,0 +1,6 @@
+{
+  "name": "MANIVYA - Manojavam Multi Enterprises",
+  "description": "Ultra-fast Quick Commerce & Multi-Enterprise store for Dairy, Amul Ice Creams, Stationery, Merch, Apparel & Daily Essentials in Visakhapatnam.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

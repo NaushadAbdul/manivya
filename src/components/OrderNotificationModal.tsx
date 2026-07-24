@@ -1,0 +1,196 @@
+import React from 'react';
+import { Order } from '../types';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  MapPin, 
+  Phone, 
+  Truck, 
+  X, 
+  ShieldCheck, 
+  Package, 
+  Receipt,
+  Navigation
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface OrderNotificationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  type: 'placed' | 'cancelled';
+  order: Partial<Order> & {
+    id: string;
+    grandTotal?: number;
+    userPhone?: string;
+    userName?: string;
+    deliveryAddress?: any;
+    cancellationReason?: string;
+  };
+  onOpenTracking?: () => void;
+}
+
+export const OrderNotificationModal: React.FC<OrderNotificationModalProps> = ({
+  isOpen,
+  onClose,
+  type,
+  order,
+  onOpenTracking
+}) => {
+  if (!isOpen) return null;
+
+  const isPlaced = type === 'placed';
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className="relative w-full max-w-md bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-800 p-6 overflow-hidden my-6 text-white"
+        >
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Icon Header */}
+          <div className="text-center space-y-3">
+            <div
+              className={`w-16 h-16 rounded-3xl flex items-center justify-center mx-auto shadow-xl border ${
+                isPlaced
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : 'bg-red-500/10 text-red-400 border-red-500/30'
+              }`}
+            >
+              {isPlaced ? (
+                <CheckCircle2 className="w-9 h-9" />
+              ) : (
+                <XCircle className="w-9 h-9" />
+              )}
+            </div>
+
+            <div>
+              <span
+                className={`inline-block px-3 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider mb-1.5 ${
+                  isPlaced
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                }`}
+              >
+                {isPlaced ? 'Order Confirmed - Pop-Up Reminder' : 'Order Cancelled - Pop-Up Reminder'}
+              </span>
+              <h2 className="text-xl font-black text-white">
+                {isPlaced ? 'Thank You for Your Order!' : 'Order Cancellation Confirmed'}
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5 font-mono">
+                Order ID: #{order.id}
+              </p>
+            </div>
+          </div>
+
+          {/* Details Card */}
+          <div className="mt-5 space-y-3 bg-zinc-950 p-4 rounded-2xl border border-zinc-800 text-xs">
+            {isPlaced ? (
+              <>
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
+                  <span className="text-zinc-400 font-mono">Estimated Delivery:</span>
+                  <span className="font-extrabold text-blue-400 flex items-center gap-1 font-mono">
+                    <Clock className="w-3.5 h-3.5" /> Cold-Chain Express Delivery
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
+                  <span className="text-zinc-400 font-mono">Contact Mobile:</span>
+                  <span className="font-bold text-white font-mono flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-emerald-400" /> +91 {order.userPhone || '7207554777'}
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between pb-2.5 border-b border-zinc-800/80">
+                  <span className="text-zinc-400 font-mono shrink-0 mr-2">Delivery Address:</span>
+                  <span className="font-medium text-zinc-200 text-right truncate max-w-[200px]">
+                    {order.deliveryAddress?.fullAddress || 'Visakhapatnam'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 font-mono">Grand Total:</span>
+                  <span className="font-black text-white font-mono text-sm">₹{order.grandTotal || 0}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
+                  <span className="text-zinc-400 font-mono">Cancellation Status:</span>
+                  <span className="font-bold text-red-400">Successfully Cancelled</span>
+                </div>
+
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
+                  <span className="text-zinc-400 font-mono">Refund Notice:</span>
+                  <span className="font-bold text-emerald-400 font-mono">100% Instant Refund</span>
+                </div>
+
+                <p className="text-zinc-400 text-[11px] leading-relaxed pt-1">
+                  Your payment of <strong className="text-white">₹{order.grandTotal || 0}</strong> will be refunded to your original payment method within 5 minutes.
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Rider / Support Banner */}
+          <div className="mt-3 p-3 bg-blue-950/40 rounded-xl border border-blue-800/40 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-blue-400 shrink-0" />
+              <div>
+                <p className="font-bold text-blue-200">
+                  {isPlaced ? 'Ramu K. (MANIVYA Rider)' : 'MANIVYA Store Support'}
+                </p>
+                <p className="text-[10px] text-zinc-400 font-mono">
+                  {isPlaced ? 'Assigned & Heading to Store' : 'Available 24x7 for queries'}
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={`tel:${order.userPhone || '7207554777'}`}
+              className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] font-mono shrink-0"
+            >
+              Call +91 7207554777
+            </a>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-5 space-y-2">
+            {isPlaced && onOpenTracking && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenTracking();
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all"
+              >
+                <Navigation className="w-4 h-4" /> Track Live on Google Maps
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition-colors ${
+                isPlaced
+                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                  : 'bg-white hover:bg-zinc-200 text-black'
+              }`}
+            >
+              Close Reminder Window
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+};
