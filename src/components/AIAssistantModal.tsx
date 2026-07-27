@@ -44,7 +44,20 @@ export const AIAssistantModal: React.FC = () => {
 
   useEffect(() => {
     if (isAIAssistantOpen && messages.length === 0) {
-      const initialGreetingText = `${greetingInfo.text}, ${userName}! ${greetingInfo.icon}\n\nWelcome to MANIVYA Multi Enterprise. I am your AI Store Assistant powered by Gemini. Ask me anything about our Amul Dairy, Ice Creams, Notebooks & Stationery, Custom T-Shirts & Mugs, or Express Delivery in Visakhapatnam!`;
+      const initialGreetingText = `${greetingInfo.text}, ${userName}! ${greetingInfo.icon} Welcome to Manojavam Multi Enterprises (MANIVYA). I am your Personal Shopping & Services Advisor.
+
+How can I help you today? Please tell me what you're looking for:
+• 🥛 Milk & Amul Dairy Products
+• 🍦 Amul Ice-Creams & Frozen Treats
+• 📓 Classmate Notebooks & Student Stationery
+• 👕 Custom Printed T-Shirts & Embroidered Head Caps
+• ☕ Magic Heat-Revealing & Ceramic Coffee Mugs
+• 🛌 Ergonomic Memory Foam Sleeping Pillows
+• 🧪 Stainless Steel Bottles & Keychains
+• ☕ Snacks, Filter Coffee & Refreshments
+• 🧼 Herbal Personal Care & Hygiene Essentials
+
+Let me know what you need or the look & feel you are aiming for, and I will recommend the best options for you!`;
       
       setMessages([
         {
@@ -64,10 +77,15 @@ export const AIAssistantModal: React.FC = () => {
   if (!isAIAssistantOpen) return null;
 
   const quickQuestions = [
-    "What Amul dairy items & ice creams are available?",
-    "How much are custom printed T-shirts & Magic Mugs?",
-    "What is your express delivery area in Visakhapatnam?",
-    "Are there any active discount coupons?"
+    "🥛 Fresh Milk & Amul Dairy",
+    "🍦 Amul Ice-Creams",
+    "📓 Notebooks & Stationery",
+    "👕 Custom T-Shirts & Head Caps",
+    "☕ Magic Coffee Mugs",
+    "🛌 Memory Foam Sleeping Pillows",
+    "🧪 Steel Water Bottles & Keychains",
+    "☕ Snacks & Filter Coffee",
+    "🧼 Personal Care Essentials"
   ];
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -75,7 +93,7 @@ export const AIAssistantModal: React.FC = () => {
     if (!text.trim()) return;
 
     const userMsg: ChatMessage = {
-      id: `usr-${Date.now()}`,
+      id: `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       sender: 'user',
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -88,20 +106,111 @@ export const AIAssistantModal: React.FC = () => {
     try {
       // Find matching products locally or ask API
       const lowerText = text.toLowerCase();
+      const cleanText = lowerText.trim().replace(/[^a-z0-9\s]/g, '');
       let matchedProds: Product[] = [];
       let botResponseText = '';
 
-      if (lowerText.includes('amul') || lowerText.includes('dairy') || lowerText.includes('milk') || lowerText.includes('ice cream')) {
+      const greetingKeywords = ['hey', 'hi', 'hello', 'heya', 'heyya', 'greetings', 'good morning', 'good afternoon', 'good evening', 'namaste', 'hola', 'yo'];
+      const isGreeting = greetingKeywords.some(g => cleanText === g || cleanText.startsWith(g + ' ') || cleanText.endsWith(' ' + g));
+
+      if (isGreeting) {
+        botResponseText = `hello ! how can i help you 😊
+
+I am your friendly store helper at Manojavam Multi Enterprises (MANIVYA). I am here to help you with anything you need! 
+
+What can I assist you with today?
+• 🥛 Milk & Amul Dairy Products
+• 🍦 Amul Ice-Creams
+• 📓 Notebooks & Stationery
+• 👕 Custom T-Shirts & Head Caps
+• ☕ Magic Coffee Mugs
+• 🛌 Sleeping Pillows
+• 🧪 Bottles & Keychains
+• ☕ Snacks & Drinks
+• 🧼 Personal Care Essentials
+
+Feel free to tell me what you're looking for or ask any questions!`;
+      } else if (lowerText.includes('pillow') || lowerText.includes('sleep') || lowerText.includes('bed')) {
+        matchedProds = products.filter(p => p.category === 'pillows-home').slice(0, 3);
+        botResponseText = `🛌 **Sleeping Pillows Advisory:**
+Looking for optimal neck alignment or plush cloud-like comfort?
+We recommend our **MANIVYA Orthopedic Contour Memory Foam Pillow** (₹799) and **Microfiber Plush Sleeping Pillow** (₹499).
+
+✨ **Why these solve your needs:**
+• Relieves cervical neck stiffness with slow-rebound memory foam.
+• Hypoallergenic breathable outer bamboo cover keeps you cool all night.
+• Perfect for back, side, and stomach sleepers.
+
+Feel free to ask if you need a specific firmness level! Reaching out after purchase gives you a 1-year shape guarantee.`;
+      } else if (lowerText.includes('bottle') || lowerText.includes('keychain') || lowerText.includes('steel') || lowerText.includes('flask')) {
+        matchedProds = products.filter(p => p.category === 'bottles-keychains').slice(0, 3);
+        botResponseText = `🧪 **Bottles & Keychains Advisory:**
+Aiming for a sleek, durable everyday carry look for college, gym, or office?
+We recommend our **Double-Wall Vacuum Insulated Stainless Steel Bottle (750ml)** (₹449) and **Laser-Engraved Metal Keychains** (₹149).
+
+✨ **Why these solve your needs:**
+• Keeps beverages cold for 24 hours / hot for 12 hours with zero condensation sweat.
+• 100% BPA-free, leak-proof screw cap with matte tactile grip.
+• Keychains feature solid rust-proof alloy with custom engraving available.
+
+Our team is available 24/7 if you need custom logo engraving after purchase!`;
+      } else if (lowerText.includes('snack') || lowerText.includes('coffee') || lowerText.includes('drink') || lowerText.includes('chips')) {
+        matchedProds = products.filter(p => p.category === 'snacks-beverages').slice(0, 3);
+        botResponseText = `☕ **Snacks & Drinks Advisory:**
+Need a quick energetic booster or authentic South Indian taste?
+We recommend our **Authentic Kumbakonam Degree Filter Coffee Mix** (₹120) and **Crispy Banana & Tapioca Snack Chips** (₹60).
+
+✨ **Why these solve your needs:**
+• Roasted chicory & Arabica coffee blend delivers rich aroma in under 2 minutes.
+• Freshly fried in pure groundnut oil with zero trans fats or preservatives.
+
+Enjoy instant cold-chain delivery! Reach out if you want recurring weekly snack subscriptions.`;
+      } else if (lowerText.includes('care') || lowerText.includes('soap') || lowerText.includes('face') || lowerText.includes('sanitizer')) {
+        matchedProds = products.filter(p => p.category === 'personal-care').slice(0, 3);
+        botResponseText = `🧼 **Personal Care Essentials Advisory:**
+Looking for gentle, dermatologically safe skin & body care?
+We recommend our **Neem & Tulsi Herbal Anti-Acne Face Wash** (₹149) and **Organic Cold-Pressed Coconut Milk Soap** (₹89).
+
+✨ **Why these solve your needs:**
+• Paraben-free, sulfate-free gentle cleansing suitable for sensitive coastal Indian skin.
+• Enriched with natural essential oils to maintain skin moisture barrier.
+
+Let us know if you need specific ingredient consultations post-purchase!`;
+      } else if (lowerText.includes('amul') || lowerText.includes('dairy') || lowerText.includes('milk') || lowerText.includes('ice cream')) {
         matchedProds = products.filter(p => p.category === 'dairy' || p.category === 'ice-creams').slice(0, 3);
-        botResponseText = `Here are our top Amul Dairy & Ice Cream items available for cold-chain express delivery at store prices:`;
+        botResponseText = `🥛 **Milk & Amul Ice Creams Advisory:**
+Looking for daily fresh pasteurized milk or refreshing family dessert tubs?
+We recommend **Amul Taaza Toned Fresh Milk (500ml)** (₹27) and **Amul Epic Choco Almond Ice Cream Stick** (₹60).
+
+✨ **Why these solve your needs:**
+• Guaranteed 100% cold-chain temperature monitoring straight to your doorstep.
+• Pure milk solids with rich calcium and no synthetic fat substitutes.
+
+Delivered in insulated cold bags straight to your doorstep in Visakhapatnam! Reach out anytime for monthly milk delivery plans.`;
       } else if (lowerText.includes('t-shirt') || lowerText.includes('tee') || lowerText.includes('mug') || lowerText.includes('custom') || lowerText.includes('cap')) {
         matchedProds = products.filter(p => p.category === 'apparel-caps' || p.category === 'mugs-drinkware').slice(0, 3);
-        botResponseText = `MANIVYA Multi Enterprise specializes in premium custom printing! Our heavy 220 GSM Cotton Tees start at ₹499 and Magic Heat-Revealing Mugs at ₹299.`;
+        botResponseText = `👕 **Custom Apparel & Coffee Mugs Advisory:**
+Aiming for a modern oversized streetwear vibe or personalized photo gift?
+We recommend our **MANIVYA 220 GSM Heavy Combed Cotton Unisex Tee** (₹499) and **Heat-Revealing Magic Ceramic Coffee Mug** (₹299).
+
+✨ **Why these solve your needs:**
+• Bio-washed anti-pilling 100% cotton tee preserves shape and vibrant color across 50+ washes.
+• Magic mug changes color from pitch black to reveal your high-res printed photo when hot liquid is poured!
+
+Upload your custom designs during checkout. Our design team will support you post-purchase if you need preview mockups!`;
       } else if (lowerText.includes('stationery') || lowerText.includes('notebook') || lowerText.includes('study') || lowerText.includes('pen')) {
         matchedProds = products.filter(p => p.category === 'stationery').slice(0, 3);
-        botResponseText = `We carry authentic Classmate notebooks, smooth gel pens, geometry sets, and study supplies for school & college students in Visakhapatnam:`;
+        botResponseText = `📓 **Notebooks & Stationery Advisory:**
+Preparing for college exams, office notes, or bullet journaling?
+We recommend **Classmate Longbook 6-Pack (172 Pages)** (₹240) and **Smooth Smudge-Free Gel Pens (Pack of 5)** (₹75).
+
+✨ **Why these solve your needs:**
+• Elemental chlorine-free paper prevents ink bleed-through even with fountain and gel pens.
+• Ergonomic rubberized pen grip reduces hand fatigue during long study sessions.
+
+Let us know if you need bulk student discount orders!`;
       } else if (lowerText.includes('delivery') || lowerText.includes('time') || lowerText.includes('pincode') || lowerText.includes('area') || lowerText.includes('address')) {
-        botResponseText = `⚡ Our MANIVYA Express Hub is located at VIP Road, Siripuram & Gajuwaka Bypass Road, Visakhapatnam (Pincode 530026 & 530003). Orders over ₹299 get FREE instant delivery!`;
+        botResponseText = `⚡ Our MANIVYA Owner Hub is located at 25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Andhra Pradesh - 530026. Orders over ₹299 get FREE express delivery!`;
       } else if (lowerText.includes('coupon') || lowerText.includes('discount') || lowerText.includes('offer')) {
         botResponseText = `🎉 Active Coupons Today:\n• MANIVYA50: ₹50 OFF on orders above ₹299\n• AMUL10: 10% OFF on Amul Dairy & Ice Creams\n• FIRST100: ₹100 OFF for new account registrations!`;
       } else {
@@ -114,7 +223,7 @@ export const AIAssistantModal: React.FC = () => {
       }
 
       const botMsg: ChatMessage = {
-        id: `bot-${Date.now()}`,
+        id: `bot-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         sender: 'bot',
         text: botResponseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -126,9 +235,9 @@ export const AIAssistantModal: React.FC = () => {
       setMessages(prev => [
         ...prev,
         {
-          id: `bot-${Date.now()}`,
+          id: `bot-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           sender: 'bot',
-          text: `I am happy to assist you with MANIVYA products! You can browse our catalog above or place an order for 10-minute delivery.`,
+          text: `I am happy to assist you with MANIVYA products! You can browse our catalog above or place an order directly.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);

@@ -1,3 +1,4 @@
+import { db, doc, setDoc } from '../lib/firebase';
 import { 
   Product, 
   CategoryInfo, 
@@ -178,9 +179,88 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to place order');
+      throw new Error(err.error || 'Failed to initialize order checkout');
     }
-    return await res.json();
+    const createdOrder: Order = await res.json();
+
+    // Sync order to Firestore if not pending
+    if (createdOrder.orderStatus !== 'pending') {
+      try {
+        await setDoc(doc(db, 'orders', createdOrder.id), {
+          id: createdOrder.id,
+          userId: createdOrder.userId || 'guest',
+          customerName: createdOrder.userName,
+          phone: createdOrder.userPhone,
+          address: createdOrder.deliveryAddress?.fullAddress || '',
+          items: createdOrder.items,
+          totalAmount: createdOrder.grandTotal,
+          paymentMethod: createdOrder.paymentMethod,
+          status: createdOrder.orderStatus,
+          createdAt: createdOrder.createdAt
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Firestore order sync error:', e);
+      }
+    }
+
+    return createdOrder;
+  },
+
+  async confirmOrder(orderId: string, details?: { txnRef?: string; paymentStatus?: string; paymentMethod?: string }): Promise<Order> {
+    const res = await fetch(`/api/orders/${orderId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(details || {})
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to confirm order');
+    }
+    const confirmedOrder: Order = await res.json();
+
+    try {
+      await setDoc(doc(db, 'orders', confirmedOrder.id), {
+        id: confirmedOrder.id,
+        userId: confirmedOrder.userId || 'guest',
+        customerName: confirmedOrder.userName,
+        phone: confirmedOrder.userPhone,
+        address: confirmedOrder.deliveryAddress?.fullAddress || '',
+        items: confirmedOrder.items,
+        totalAmount: confirmedOrder.grandTotal,
+        paymentMethod: confirmedOrder.paymentMethod,
+        status: confirmedOrder.orderStatus,
+        createdAt: confirmedOrder.createdAt
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore order sync error:', e);
+    }
+
+    return confirmedOrder;
+  },
+
+  async cancelOrder(orderId: string, reason?: string): Promise<{ success: boolean; order?: Order }> {
+    const res = await fetch(`/api/orders/${orderId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to cancel order');
+    }
+    const data = await res.json();
+
+    if (data.order) {
+      try {
+        await setDoc(doc(db, 'orders', data.order.id), {
+          status: 'cancelled'
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Firestore cancel sync error:', e);
+      }
+    }
+
+    return data;
   },
 
   async updateOrderStatus(orderId: string, status: OrderStatus, token?: string): Promise<Order> {
@@ -200,17 +280,49 @@ export const api = {
     return await res.json();
   },
 
-  // Owner Auth & Stats
-  async adminLogin(passcode: string): Promise<{ success: boolean; token: string }> {
+  // Auth & Admin API
+  async adminLogin(payload: { email?: string; password?: string; passcode?: string } | string): Promise<{ success: boolean; token: string; user?: any }> {
+    const body = typeof payload === 'string' 
+      ? { passcode: payload, email: 'admin@manivya.com' } 
+      : payload;
+
     const res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passcode })
+      body: JSON.stringify(body)
     });
-    if (!res.ok) {
-      throw new Error('Invalid owner security passcode');
+    
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Invalid admin credentials');
     }
-    return await res.json();
+    return data;
+  },
+
+  async userLogin(email: string, password: string): Promise<{ success: boolean; token: string; user: any }> {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Login failed');
+    }
+    return data;
+  },
+
+  async userRegister(userData: { name: string; email: string; password: string; phone?: string }): Promise<{ success: boolean; token: string; user: any }> {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Registration failed');
+    }
+    return data;
   },
 
   async getAdminStats(token: string): Promise<AdminStats> {
@@ -230,5 +342,35 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to get AI recommendation');
     return await res.json();
+  },
+
+  // MongoDB Atlas Diagnostics
+  async getMongoDBStatus(): Promise<{
+    databaseType: string;
+    isConnected: boolean;
+    readyState: number;
+    connectionError: string | null;
+    uriConfigured: boolean;
+    collections: {
+      productsCount: number;
+      ordersCount: number;
+      categoriesCount: number;
+      couponsCount: number;
+    };
+  }> {
+    const res = await fetch('/api/mongodb/status');
+    if (!res.ok) throw new Error('Failed to fetch MongoDB status');
+    return await res.json();
+  },
+
+  async connectMongoDB(mongoUri?: string): Promise<any> {
+    const res = await fetch('/api/mongodb/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mongoUri })
+    });
+    if (!res.ok) throw new Error('Failed to trigger MongoDB connection');
+    return await res.json();
   }
 };
+

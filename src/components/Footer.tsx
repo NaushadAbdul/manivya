@@ -17,7 +17,7 @@ export const Footer: React.FC = () => {
   const { businessInfo, setSelectedCategory, setIsAIAssistantOpen, setIsAdminModalOpen } = useStore();
 
   return (
-    <footer className="bg-black text-zinc-400 border-t border-zinc-900 transition-colors pt-12 pb-8 px-4 sm:px-6 lg:px-8 mt-16 font-sans">
+    <footer className="bg-[#4A3060] text-zinc-400 border-t border-purple-900/40 transition-colors pt-12 pb-8 px-4 sm:px-6 lg:px-8 mt-16 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
         
         {/* Top Badges Bar */}
@@ -163,10 +163,10 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* AI & Owner Access */}
+          {/* AI Assistance */}
           <div className="space-y-3">
             <p className="text-xs font-mono font-bold uppercase text-white tracking-wider">
-              Customer & Management
+              Customer Support
             </p>
             <div className="space-y-2">
               <button
@@ -175,13 +175,6 @@ export const Footer: React.FC = () => {
               >
                 <span>Launch Gemini AI Assistant</span>
                 <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                onClick={() => setIsAdminModalOpen(true)}
-                className="w-full py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs font-mono font-semibold flex items-center justify-between transition-all"
-              >
-                <span>Owner Portal Access</span>
               </button>
             </div>
           </div>

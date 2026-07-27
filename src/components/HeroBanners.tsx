@@ -6,9 +6,9 @@ import { useStore } from '../context/StoreContext';
 const BANNERS = [
   {
     id: 'b-1',
-    badge: 'MANIVYA EXPRESS ⚡ 10-MIN HUB',
+    badge: 'MANIVYA EXPRESS HUB ⚡',
     title: 'Fresh Amul Dairy & Real Milk Ice Creams',
-    subtitle: 'Amul Taaza Milk, Butter, Paneer & Epic Almond Chocobar delivered directly to your doorstep in 10 minutes!',
+    subtitle: 'Amul Taaza Milk, Butter, Paneer & Epic Almond Chocobar delivered directly to your doorstep!',
     cta: 'Order Amul Fresh',
     category: 'dairy',
     bgColor: 'from-emerald-950 via-neutral-900 to-black',
@@ -53,15 +53,15 @@ export const HeroBanners: React.FC = () => {
   const banner = BANNERS[current];
 
   return (
-    <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2">
-      <div className="relative rounded-3xl overflow-hidden bg-zinc-900 text-white shadow-xl min-h-[260px] sm:min-h-[300px] flex items-center border border-zinc-800">
+    <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-2">
+      <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-zinc-900 text-white shadow-xl min-h-[220px] sm:min-h-[280px] flex items-center border border-zinc-800">
         
         {/* Background Image Overlay */}
         <div className="absolute right-0 top-0 bottom-0 w-full md:w-1/2 opacity-25 bg-cover bg-center mix-blend-luminosity" style={{ backgroundImage: `url(${banner.image})` }} />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-zinc-950/95 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-zinc-950/95 to-transparent sm:to-transparent" />
 
         {/* Banner Content */}
-        <div className="relative z-10 p-6 sm:p-10 max-w-2xl">
+        <div className="relative z-10 p-4 sm:p-8 md:p-10 max-w-2xl">
           <AnimatePresence mode="wait">
             <motion.div
               key={banner.id}
@@ -69,36 +69,36 @@ export const HeroBanners: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.4 }}
-              className="space-y-3"
+              className="space-y-2 sm:space-y-3"
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 backdrop-blur-md border border-blue-500/20 text-[11px] font-mono font-bold tracking-wider uppercase text-blue-400">
-                <Zap className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-blue-500/10 backdrop-blur-md border border-blue-500/20 text-[10px] sm:text-[11px] font-mono font-bold tracking-wider uppercase text-blue-400">
+                <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400 animate-pulse" />
                 <span>{banner.badge}</span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white leading-tight font-sans">
+              <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight text-white leading-tight font-sans">
                 {banner.title}
               </h1>
 
-              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-xl">
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-xl line-clamp-2 sm:line-clamp-none">
                 {banner.subtitle}
               </p>
 
-              <div className="pt-2 flex flex-wrap items-center gap-3">
+              <div className="pt-1.5 sm:pt-2 flex flex-wrap items-center gap-2 sm:gap-3">
                 <button
                   onClick={() => setSelectedCategory(banner.category as any)}
-                  className="px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-all active:scale-95"
+                  className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-all active:scale-95"
                 >
                   <span>{banner.cta}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
 
                 <button
                   onClick={() => setIsAIAssistantOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 font-semibold text-xs sm:text-sm border border-zinc-700/80 backdrop-blur-md flex items-center gap-1.5 transition-all"
+                  className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 font-semibold text-xs sm:text-sm border border-zinc-700/80 backdrop-blur-md flex items-center gap-1.5 transition-all"
                 >
-                  <Sparkles className="w-4 h-4 text-blue-400" />
-                  <span>AI Bundle Recommendation</span>
+                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
+                  <span>AI Bundle</span>
                 </button>
               </div>
             </motion.div>

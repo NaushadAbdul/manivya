@@ -137,6 +137,18 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
           {/* Scrollable Content Body */}
           <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+            {/* Warm Greeting Message Banner */}
+            {!isCancelled && (
+              <div className="p-3.5 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-blue-500/20 border border-emerald-500/40 rounded-2xl text-center space-y-1">
+                <p className="text-base font-black text-emerald-300">
+                  Order placed thank you , Visit again 😊🙏🏻
+                </p>
+                <p className="text-xs text-zinc-300">
+                  We are packing your ordered fresh items with maximum safety & care!
+                </p>
+              </div>
+            )}
+
             {/* Delivery Progress & Live Status */}
             <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800/80 space-y-4">
               <div className="flex items-center justify-between">
@@ -146,9 +158,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     Delivery Status & Tracking
                   </span>
                 </div>
-                {!isCancelled && order.deliveryEtaMinutes && (
+                {!isCancelled && (
                   <span className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                    ETA: ~{order.deliveryEtaMinutes} Mins
+                    Direct Express Delivery
                   </span>
                 )}
               </div>
@@ -227,7 +239,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               {!isCancelled && (
                 <div className="mt-3">
                   <DeliveryMapTracker
-                    fromAddress="MANIVYA Express Hub, VIP Road, Siripuram, Visakhapatnam - 530003"
+                    fromAddress="25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026"
                     toAddress={`${order.deliveryAddress.fullAddress}, ${order.deliveryAddress.area}, ${order.deliveryAddress.pincode}`}
                     orderId={order.id}
                     etaMinutes={order.deliveryEtaMinutes || 8}

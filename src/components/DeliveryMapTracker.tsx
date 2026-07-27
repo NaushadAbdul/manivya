@@ -12,12 +12,12 @@ interface DeliveryMapTrackerProps {
   onAddressChange?: (newToAddress: string) => void;
 }
 
-const STORE_COORDS = { lat: 17.7231, lng: 83.3012 }; // MANIVYA Hub VIP Road, Visakhapatnam
+const STORE_COORDS = { lat: 17.6888, lng: 83.2185 }; // MANIVYA Owner Hub Gajuwaka Bypass Rd
 const DEFAULT_USER_COORDS = { lat: 17.6888, lng: 83.2185 }; // Pedagantyada / Gajuwaka, Visakhapatnam
 
 export const DeliveryMapTracker: React.FC<DeliveryMapTrackerProps> = ({
-  fromAddress = "MANIVYA Hub, VIP Road, Siripuram, Visakhapatnam - 530003",
-  toAddress = "25-1-13, Gajuwaka Bypass Road, Pedagantyada, Visakhapatnam - 530026",
+  fromAddress = "25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026",
+  toAddress = "25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026",
   orderId = "MNE-9482",
   etaMinutes = 7,
   riderName = "Ramu K. (MANIVYA Rider)",
@@ -31,11 +31,24 @@ export const DeliveryMapTracker: React.FC<DeliveryMapTrackerProps> = ({
   const [progress, setProgress] = useState(0.65); // 65% along route
   const [currentSpeed, setCurrentSpeed] = useState(36); // km/h
 
+  const [hasMapError, setHasMapError] = useState(false);
+
   const apiKey =
     process.env.GOOGLE_MAPS_PLATFORM_KEY ||
     (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
     '';
-  const hasValidKey = Boolean(apiKey) && apiKey !== 'YOUR_API_KEY';
+  const hasValidKey = Boolean(apiKey) && apiKey !== 'YOUR_API_KEY' && apiKey.length > 20;
+
+  useEffect(() => {
+    const prevAuthFailure = (window as any).gm_authFailure;
+    (window as any).gm_authFailure = () => {
+      setHasMapError(true);
+      if (typeof prevAuthFailure === 'function') prevAuthFailure();
+    };
+    return () => {
+      (window as any).gm_authFailure = prevAuthFailure;
+    };
+  }, []);
 
   // Rider animated location
   const riderLat = STORE_COORDS.lat + (DEFAULT_USER_COORDS.lat - STORE_COORDS.lat) * progress;
@@ -69,7 +82,7 @@ export const DeliveryMapTracker: React.FC<DeliveryMapTrackerProps> = ({
             <Navigation className="w-3.5 h-3.5" /> Live Google Maps Tracking
           </span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-1">
-            <Clock className="w-3 h-3" /> ETA {etaMinutes} Mins
+            <Truck className="w-3 h-3" /> Live Dispatch
           </span>
         </div>
 
@@ -131,7 +144,7 @@ export const DeliveryMapTracker: React.FC<DeliveryMapTrackerProps> = ({
 
       {/* Map View Area */}
       <div className="relative w-full h-64 md:h-72 bg-zinc-900 overflow-hidden">
-        {hasValidKey ? (
+        {hasValidKey && !hasMapError ? (
           <APIProvider apiKey={apiKey} version="weekly">
             <Map
               defaultCenter={STORE_COORDS}
@@ -141,7 +154,7 @@ export const DeliveryMapTracker: React.FC<DeliveryMapTrackerProps> = ({
               style={{ width: '100%', height: '100%' }}
             >
               {/* Store Origin Marker */}
-              <AdvancedMarker position={STORE_COORDS} title="MANIVYA Hub VIP Road">
+              <AdvancedMarker position={STORE_COORDS} title="MANIVYA Owner Hub Gajuwaka">
                 <Pin background="#8B5CF6" glyphColor="#FFFFFF" borderColor="#6D28D9" />
               </AdvancedMarker>
 
@@ -191,7 +204,7 @@ export const DeliveryMapTracker: React.FC<DeliveryMapTrackerProps> = ({
             {/* From Pin (Store) */}
             <div className="absolute left-[12%] top-[60%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
               <div className="px-2 py-0.5 rounded bg-purple-900/90 text-purple-200 border border-purple-500/40 text-[10px] font-mono font-bold mb-1 shadow-md whitespace-nowrap">
-                FROM: MANIVYA VIP Road Hub
+                FROM: MANIVYA Gajuwaka Owner Hub
               </div>
               <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-lg border-2 border-white">
                 <Store className="w-4 h-4" />

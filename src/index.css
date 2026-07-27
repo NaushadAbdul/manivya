@@ -5,12 +5,16 @@
     color-scheme: dark;
   }
   body {
-    background-color: #000000;
+    background-color: #4A3060;
     color: #f4f4f5;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
   }
+}
+
+.font-inconsolata {
+  font-family: 'Inconsolata', monospace;
 }
 
 /* Custom scrollbar for dark theme */
@@ -19,7 +23,7 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: #4A3060;
 }
 ::-webkit-scrollbar-thumb {
   background: #27272a;

@@ -3,7 +3,8 @@ import { useStore } from '../context/StoreContext';
 import { ManivyaLogo } from './ManivyaLogo';
 import { OrderDetailModal } from './OrderDetailModal';
 import { api } from '../services/api';
-import { Product, CategoryInfo, Coupon, Order, OrderStatus, AdminStats, ProductCategory } from '../types';
+import { Product, CategoryInfo, Coupon, Order, OrderStatus, AdminStats, ProductCategory, LocationArea } from '../types';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { 
   Lock, 
   X, 
@@ -26,8 +27,17 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   ImageOff,
-  Eye
+  Eye,
+  MapPin,
+  Navigation,
+  Compass,
+  Map as MapIcon,
+  Phone,
+  Database,
+  Server,
+  HardDrive
 } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'motion/react';
 
 // Helper to clean & parse Google Images / Google Drive URLs
@@ -78,12 +88,66 @@ export const AdminDashboard: React.FC = () => {
     refreshProducts,
     refreshCategories,
     categories,
-    products
+    products,
+    deliveryLocations,
+    addDeliveryLocation,
+    updateDeliveryLocation,
+    deleteDeliveryLocation
   } = useStore();
 
+  const [adminEmail, setAdminEmail] = useState('admin@manivya.com');
+  const [adminPassword, setAdminPassword] = useState('');
   const [passcode, setPasscode] = useState('');
-  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'categories' | 'orders' | 'coupons' | 'settings'>('analytics');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'categories' | 'orders' | 'locations' | 'coupons' | 'database' | 'settings'>('analytics');
   const [stats, setStats] = useState<AdminStats | null>(null);
+
+  // MongoDB Atlas State
+  const [mongoStatus, setMongoStatus] = useState<any>(null);
+  const [mongoInputUri, setMongoInputUri] = useState('');
+  const [isTestingMongo, setIsTestingMongo] = useState(false);
+
+  const fetchMongoStatus = async () => {
+    try {
+      const res = await api.getMongoDBStatus();
+      setMongoStatus(res);
+    } catch (e) {
+      console.warn('MongoDB status fetch error:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (adminToken) {
+      fetchMongoStatus();
+    }
+  }, [adminToken]);
+
+  const handleTestMongoConnection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsTestingMongo(true);
+    try {
+      const res = await api.connectMongoDB(mongoInputUri.trim() || undefined);
+      setMongoStatus(res.status || res);
+      if (res.connected) {
+        addToast('✅ Successfully connected to MongoDB Atlas Cloud Cluster!', 'success');
+        refreshProducts();
+      } else {
+        addToast(`❌ Connection Failed: ${res.reason || 'Check your MONGODB_URI connection string'}`, 'error');
+      }
+    } catch (err: any) {
+      addToast(err.message || 'Failed to connect to MongoDB Atlas', 'error');
+    } finally {
+      setIsTestingMongo(false);
+    }
+  };
+
+  // Form states for Owner's Google Maps Delivery Location Creator
+  const [locName, setLocName] = useState('');
+  const [locArea, setLocArea] = useState('');
+  const [locPincode, setLocPincode] = useState('530026');
+  const [locEta, setLocEta] = useState('10-15 Mins');
+  const [locLat, setLocLat] = useState<number>(17.6888);
+  const [locLng, setLocLng] = useState<number>(83.2185);
 
   // Form states for adding product
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -163,12 +227,21 @@ export const AdminDashboard: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmittingAuth(true);
     try {
-      const res = await api.adminLogin(passcode);
+      const res = await api.adminLogin({
+        email: adminEmail,
+        password: adminPassword,
+        passcode: passcode || adminPassword
+      });
       adminLogin(res.token);
+      setAdminPassword('');
       setPasscode('');
+      addToast('Welcome back, Admin! Secure token verified.', 'success');
     } catch (err: any) {
-      addToast(err.message || 'Invalid passcode', 'error');
+      addToast(err.message || 'Invalid admin credentials', 'error');
+    } finally {
+      setIsSubmittingAuth(false);
     }
   };
 
@@ -229,6 +302,27 @@ export const AdminDashboard: React.FC = () => {
         addToast(err.message || 'Failed to delete product', 'error');
       }
     }
+  };
+
+  const handleAddOwnerLocation = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locName.trim() || !locArea.trim()) {
+      addToast('Please enter Hub Name and Area details', 'error');
+      return;
+    }
+
+    addDeliveryLocation({
+      name: locName.trim(),
+      area: locArea.trim(),
+      pincode: locPincode.trim() || '530026',
+      deliveryEta: locEta.trim() || '10-15 Mins',
+      isServiceable: true,
+      lat: locLat,
+      lng: locLng
+    });
+
+    setLocName('');
+    setLocArea('');
   };
 
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -319,12 +413,12 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="relative w-full max-w-4xl bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-800 overflow-hidden my-8 max-h-[88vh] flex flex-col text-zinc-100"
+          className="relative w-full max-w-5xl bg-zinc-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-zinc-800 overflow-hidden my-4 sm:my-8 max-h-[92vh] flex flex-col text-zinc-100"
         >
           {/* Header */}
           <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950 text-white">
@@ -364,32 +458,62 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           {!adminToken ? (
-            /* Passcode Unlock Form */
-            <div className="p-8 max-w-sm mx-auto my-auto text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20">
+            /* Dedicated Admin Authentication Form */
+            <div className="p-8 max-w-md mx-auto my-auto text-center space-y-6">
+              <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20 shadow-inner">
                 <KeyRound className="w-8 h-8" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Owner Security Verification</h3>
+                <h3 className="text-xl font-bold text-white">Administrator Access Portal</h3>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Enter your owner passcode (Default: <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-blue-400 font-mono">owner123</code>)
+                  Authenticate with MongoDB Atlas credentials to manage MANIVYA store operations.
                 </p>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-3">
-                <input
-                  type="password"
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Enter Security Passcode"
-                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 font-mono font-bold text-center text-white text-sm outline-none focus:border-blue-500"
-                  autoFocus
-                />
+              <form onSubmit={handleLogin} className="space-y-4 text-left">
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1">
+                    Admin Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="admin@manivya.com"
+                    className="w-full px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1">
+                    Admin Password / Passcode
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 space-y-1 font-mono">
+                  <div className="font-bold text-blue-400 flex items-center gap-1">
+                    <span>🔐 Default Administrator Credentials:</span>
+                  </div>
+                  <div>Email: <code className="text-zinc-200">admin@manivya.com</code></div>
+                  <div>Password: <code className="text-zinc-200">admin123</code> or passcode <code className="text-zinc-200">owner123</code></div>
+                </div>
+
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-white hover:bg-zinc-200 text-black font-black text-sm shadow-md transition-all"
+                  disabled={isSubmittingAuth}
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2"
                 >
-                  Unlock Owner Dashboard
+                  {isSubmittingAuth ? 'Authenticating...' : 'Sign In to Admin Portal'}
                 </button>
               </form>
             </div>
@@ -398,7 +522,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               
               {/* Left Sidebar Navigation */}
-              <div className="w-full md:w-52 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950 p-2 flex md:flex-col gap-1 overflow-x-auto shrink-0 font-mono text-xs font-bold">
+              <div className="w-full md:w-52 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950 p-2 flex md:flex-col gap-1 overflow-x-auto no-scrollbar shrink-0 font-mono text-xs font-bold">
                 <button
                   onClick={() => setActiveTab('analytics')}
                   className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${
@@ -436,6 +560,15 @@ export const AdminDashboard: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => setActiveTab('locations')}
+                  className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${
+                    activeTab === 'locations' ? 'bg-white text-black font-black' : 'text-zinc-400 hover:bg-zinc-900'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4 text-emerald-400" /> Hubs & Maps ({deliveryLocations.length})
+                </button>
+
+                <button
                   onClick={() => setActiveTab('coupons')}
                   className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${
                     activeTab === 'coupons' ? 'bg-white text-black font-black' : 'text-zinc-400 hover:bg-zinc-900'
@@ -443,10 +576,26 @@ export const AdminDashboard: React.FC = () => {
                 >
                   <Tag className="w-4 h-4" /> Coupons
                 </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('database');
+                    fetchMongoStatus();
+                  }}
+                  className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${
+                    activeTab === 'database' ? 'bg-emerald-500 text-black font-black' : 'text-zinc-400 hover:bg-zinc-900'
+                  }`}
+                >
+                  <Database className="w-4 h-4 text-emerald-400" /> MongoDB Atlas
+                  {mongoStatus?.isConnected && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  )}
+                </button>
               </div>
 
               {/* Right Content Body */}
               <div className="flex-1 p-5 overflow-y-auto">
+
                 
                 {/* TAB 1: Analytics */}
                 {activeTab === 'analytics' && (
@@ -950,7 +1099,247 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* TAB 4: Coupons */}
+                {/* TAB 4: Delivery Locations & Google Maps Portal */}
+                {activeTab === 'locations' && (
+                  <div className="space-y-6">
+                    {/* Header Banner */}
+                    <div className="p-4 bg-gradient-to-r from-blue-900/40 via-indigo-900/40 to-emerald-900/40 border border-blue-500/30 rounded-2xl space-y-1">
+                      <div className="flex items-center gap-2 text-white font-bold text-base">
+                        <MapPin className="w-5 h-5 text-emerald-400" />
+                        <span>Owner Google Maps & Express Delivery Hub Portal</span>
+                      </div>
+                      <p className="text-xs text-zinc-300 leading-relaxed">
+                        As the Owner, you can view user order drop-off locations on Google Maps, set exact GPS coordinates, and add custom express delivery hubs for Visakhapatnam.
+                      </p>
+                    </div>
+
+                    {/* Add New Hub Form with Google Maps Access */}
+                    <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800 space-y-4">
+                      <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                        <span className="text-xs font-mono font-bold text-emerald-400 uppercase flex items-center gap-1.5">
+                          <Plus className="w-4 h-4" /> Add Delivery Location with Google Maps
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-mono">Owner Portal Exclusive</span>
+                      </div>
+
+                      <form onSubmit={handleAddOwnerLocation} className="space-y-3 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-zinc-400 font-mono mb-1">Hub / Location Name *</label>
+                            <input
+                              type="text"
+                              value={locName}
+                              onChange={e => setLocName(e.target.value)}
+                              placeholder="e.g. Gajuwaka Bypass Road Hub"
+                              className="w-full p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white font-semibold outline-none focus:border-emerald-500"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-zinc-400 font-mono mb-1">Area / Landmark *</label>
+                            <input
+                              type="text"
+                              value={locArea}
+                              onChange={e => setLocArea(e.target.value)}
+                              placeholder="e.g. Durgavanipalem, Pedagantyada"
+                              className="w-full p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white font-semibold outline-none focus:border-emerald-500"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-zinc-400 font-mono mb-1">Pincode</label>
+                            <input
+                              type="text"
+                              value={locPincode}
+                              onChange={e => setLocPincode(e.target.value)}
+                              placeholder="530026"
+                              className="w-full p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white font-mono outline-none focus:border-emerald-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-zinc-400 font-mono mb-1">Delivery ETA</label>
+                            <input
+                              type="text"
+                              value={locEta}
+                              onChange={e => setLocEta(e.target.value)}
+                              placeholder="10-15 Mins"
+                              className="w-full p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white font-mono outline-none focus:border-emerald-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-zinc-400 font-mono mb-1">Latitude (Google Maps)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={locLat}
+                              onChange={e => setLocLat(Number(e.target.value))}
+                              className="w-full p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white font-mono text-xs outline-none focus:border-emerald-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-zinc-400 font-mono mb-1">Longitude (Google Maps)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={locLng}
+                              onChange={e => setLocLng(Number(e.target.value))}
+                              className="w-full p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-white font-mono text-xs outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interactive Google Maps Preview Box */}
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[11px] font-mono font-bold text-zinc-400 block">
+                            🗺️ Google Maps Access - Pin Location Visualizer
+                          </span>
+                          <div className="h-44 w-full rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 relative">
+                            <iframe
+                              title="Google Maps Location Picker"
+                              width="100%"
+                              height="100%"
+                              frameBorder="0"
+                              style={{ border: 0 }}
+                              src={`https://maps.google.com/maps?q=${locLat},${locLng}&z=15&output=embed`}
+                              allowFullScreen
+                            />
+                            <div className="absolute top-2 right-2 px-2.5 py-1 bg-black/80 backdrop-blur-md rounded-lg text-[10px] text-emerald-400 font-mono border border-emerald-500/30 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> Pin: {locLat.toFixed(4)}, {locLng.toFixed(4)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="submit"
+                            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all"
+                          >
+                            <Plus className="w-4 h-4" /> Save Delivery Location to Store
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
+                    {/* Serviceable Delivery Hubs List */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-mono font-bold text-zinc-400 uppercase">
+                        Current Store Delivery Hubs ({deliveryLocations.length})
+                      </h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {deliveryLocations.map((loc, idx) => (
+                          <div
+                            key={`owner-loc-${loc.id}-${idx}`}
+                            className="p-3.5 rounded-2xl border border-zinc-800 bg-zinc-950 space-y-2 text-xs flex flex-col justify-between"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-0.5">
+                                <p className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                                  <Building className="w-4 h-4 text-blue-400" />
+                                  <span>{loc.name}</span>
+                                </p>
+                                <p className="text-zinc-400 text-[11px]">{loc.area} (Pincode: {loc.pincode})</p>
+                              </div>
+                              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono text-[10px] font-bold">
+                                {loc.deliveryEta}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 text-[11px] font-mono">
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name + ', ' + loc.area + ' Visakhapatnam')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-400 hover:underline flex items-center gap-1 text-[11px]"
+                              >
+                                <MapPin className="w-3.5 h-3.5" /> View Google Maps
+                              </a>
+
+                              <button
+                                type="button"
+                                onClick={() => deleteDeliveryLocation(loc.id)}
+                                className="text-red-400 hover:text-red-300 font-bold flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Remove Hub
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Customer Live Orders Location Tracker on Google Maps */}
+                    <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-bold text-blue-400 uppercase flex items-center gap-1.5">
+                          <Compass className="w-4 h-4" /> Customer Live Orders Location Radar
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          {allOrders.length} Recent Customer Orders
+                        </span>
+                      </div>
+
+                      {allOrders.length === 0 ? (
+                        <p className="text-zinc-500 text-xs italic py-2">No active customer orders placed yet.</p>
+                      ) : (
+                        <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                          {allOrders.map((ord, oIdx) => (
+                            <div key={`order-loc-${ord.id}-${oIdx}`} className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs space-y-2">
+                              <div className="flex items-center justify-between font-mono">
+                                <span className="font-extrabold text-white">{ord.id} - {ord.userName}</span>
+                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                  <Phone className="w-3 h-3" /> +91 {ord.userPhone || '7207554777'}
+                                </span>
+                              </div>
+
+                              <div className="text-zinc-300 text-[11px] leading-tight">
+                                <strong>Delivery Address:</strong> {ord.deliveryAddress?.fullAddress || 'Visakhapatnam'}
+                              </div>
+
+                              <div className="flex items-center justify-between pt-1">
+                                <a
+                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ord.deliveryAddress?.fullAddress || 'Gajuwaka Visakhapatnam')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 rounded-lg font-mono text-[10px] font-bold flex items-center gap-1"
+                                >
+                                  <MapIcon className="w-3 h-3" /> Track Customer on Google Maps
+                                </a>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    addDeliveryLocation({
+                                      name: ord.deliveryAddress?.area || 'Customer Hub',
+                                      area: ord.deliveryAddress?.fullAddress || 'Visakhapatnam',
+                                      pincode: ord.deliveryAddress?.pincode || '530026',
+                                      deliveryEta: '10 Mins',
+                                      isServiceable: true,
+                                      lat: 17.6888,
+                                      lng: 83.2185
+                                    });
+                                  }}
+                                  className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg font-mono text-[10px] font-bold flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" /> Add Location as Delivery Hub
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 5: Coupons */}
                 {activeTab === 'coupons' && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-mono font-bold text-zinc-400 uppercase">Discount Coupons</h3>
@@ -970,6 +1359,169 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* TAB 6: MongoDB Atlas Management */}
+                {activeTab === 'database' && (
+                  <div className="space-y-4 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-mono font-bold text-emerald-400 uppercase flex items-center gap-2">
+                          <Database className="w-4 h-4 text-emerald-400" />
+                          MongoDB Atlas Cloud Database Integration
+                        </h3>
+                        <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                          Enterprise NoSQL persistence for Manojavam Multi Enterprises store data.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={fetchMongoStatus}
+                        className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono font-bold text-xs flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Refresh Status
+                      </button>
+                    </div>
+
+                    {/* Status Overview Card */}
+                    <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+                      <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${mongoStatus?.isConnected ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50 animate-pulse' : 'bg-amber-500'}`} />
+                          <span className="font-mono font-extrabold text-sm text-white">
+                            {mongoStatus?.isConnected ? 'CONNECTED TO MONGODB ATLAS' : 'DISCONNECTED / IN-MEMORY FALLBACK MODE'}
+                          </span>
+                        </div>
+
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/20">
+                          {mongoStatus?.databaseType || 'MongoDB Atlas'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-center">
+                        <div className="p-2.5 bg-zinc-900/60 rounded-xl border border-zinc-800">
+                          <p className="text-[10px] text-zinc-500 uppercase">Products Synced</p>
+                          <p className="text-lg font-bold text-white">{mongoStatus?.collections?.productsCount ?? products.length}</p>
+                        </div>
+
+                        <div className="p-2.5 bg-zinc-900/60 rounded-xl border border-zinc-800">
+                          <p className="text-[10px] text-zinc-500 uppercase">Orders Synced</p>
+                          <p className="text-lg font-bold text-white">{mongoStatus?.collections?.ordersCount ?? allOrders.length}</p>
+                        </div>
+
+                        <div className="p-2.5 bg-zinc-900/60 rounded-xl border border-zinc-800">
+                          <p className="text-[10px] text-zinc-500 uppercase">Categories</p>
+                          <p className="text-lg font-bold text-white">{mongoStatus?.collections?.categoriesCount ?? categories.length}</p>
+                        </div>
+
+                        <div className="p-2.5 bg-zinc-900/60 rounded-xl border border-zinc-800">
+                          <p className="text-[10px] text-zinc-500 uppercase">Coupons</p>
+                          <p className="text-lg font-bold text-white">{mongoStatus?.collections?.couponsCount ?? allCoupons.length}</p>
+                        </div>
+                      </div>
+
+                      {mongoStatus?.connectionError && (
+                        <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-200 font-mono text-[11px] space-y-2">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-amber-300">Database Connection Notice:</p>
+                              <p className="text-zinc-300 mt-0.5">{mongoStatus.connectionError}</p>
+                            </div>
+                          </div>
+
+                          {(mongoStatus.connectionError.includes('IP') || mongoStatus.connectionError.includes('Whitelist') || mongoStatus.connectionError.includes('Blocked')) && (
+                            <div className="p-3 bg-zinc-900/80 rounded-lg border border-amber-500/30 text-zinc-300 space-y-1.5 font-sans">
+                              <p className="font-bold text-emerald-400 text-xs font-mono">🛠️ How to Fix MongoDB Atlas IP Whitelist (1 Minute):</p>
+                              <ol className="list-decimal list-inside space-y-1 text-[11px] text-zinc-300">
+                                <li>Log in to <a href="https://cloud.mongodb.com/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline font-mono">MongoDB Atlas Dashboard</a></li>
+                                <li>Navigate to <strong className="text-white">Security &gt; Network Access</strong> in the left sidebar</li>
+                                <li>Click <strong className="text-white">+ Add IP Address</strong></li>
+                                <li>Click <strong className="text-emerald-400">ALLOW ACCESS FROM ANYWHERE</strong> (enters <code className="bg-zinc-800 px-1 py-0.5 rounded font-mono text-emerald-300">0.0.0.0/0</code>)</li>
+                                <li>Click <strong className="text-white">Confirm</strong> and wait 1 minute for rules to propagate</li>
+                                <li>Click <strong className="text-emerald-400 font-mono">Connect / Verify MongoDB Atlas</strong> below</li>
+                              </ol>
+                            </div>
+                          )}
+
+                          {(mongoStatus.connectionError.toLowerCase().includes('auth') || mongoStatus.connectionError.toLowerCase().includes('password')) && (
+                            <div className="p-3 bg-zinc-900/80 rounded-lg border border-amber-500/30 text-zinc-300 space-y-1.5 font-sans">
+                              <p className="font-bold text-amber-400 text-xs font-mono">🔑 How to Fix MongoDB Atlas Authentication Failure:</p>
+                              <ol className="list-decimal list-inside space-y-1 text-[11px] text-zinc-300">
+                                <li>Log in to <a href="https://cloud.mongodb.com/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline font-mono">MongoDB Atlas Dashboard</a></li>
+                                <li>Go to <strong className="text-white">Security &gt; Database Access</strong></li>
+                                <li>Edit your Database User or create a new user (e.g., <code className="text-emerald-300 bg-zinc-800 px-1 py-0.5 rounded">admin</code>) and set a password</li>
+                                <li>Ensure special characters in password are URL-encoded (or use alphanumeric characters)</li>
+                                <li>Update your <code className="text-emerald-300 bg-zinc-800 px-1 py-0.5 rounded">MONGODB_URI</code> below with the correct username and password</li>
+                                <li>Click <strong className="text-emerald-400 font-mono">Connect / Verify MongoDB Atlas</strong></li>
+                              </ol>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* MongoDB Atlas URI Configurator */}
+                    <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+                      <div className="flex items-center gap-2 text-zinc-300 font-mono font-bold text-xs uppercase">
+                        <Server className="w-4 h-4 text-blue-400" />
+                        <span>MongoDB Atlas Connection String (`MONGODB_URI`)</span>
+                      </div>
+
+                      <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
+                        You can configure <code className="text-emerald-300 font-mono bg-zinc-900 px-1 py-0.5 rounded">MONGODB_URI</code> in your AI Studio project secrets / environment variables, or enter your MongoDB Atlas connection string below to test live cluster connectivity.
+                      </p>
+
+                      <form onSubmit={handleTestMongoConnection} className="space-y-2">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={mongoInputUri}
+                            onChange={(e) => setMongoInputUri(e.target.value)}
+                            placeholder="mongodb+srv://<user>:<password>@cluster0.xxx.mongodb.net/manivya?retryWrites=true&w=majority"
+                            className="w-full p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-mono text-white outline-none focus:border-emerald-500 placeholder:text-zinc-600"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <p className="text-[10px] text-zinc-500 font-mono">
+                            Declared in <code className="text-zinc-400">.env.example</code>: MONGODB_URI
+                          </p>
+
+                          <button
+                            type="submit"
+                            disabled={isTestingMongo}
+                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-extrabold text-xs font-mono shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
+                          >
+                            {isTestingMongo ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Testing Connection...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Connect / Verify MongoDB Atlas</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
+                    {/* Information Box */}
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-zinc-300 text-[11px] space-y-1">
+                      <p className="font-bold text-blue-300 font-mono">⚡ How MongoDB Atlas Works in this App:</p>
+                      <ul className="list-disc list-inside space-y-1 text-zinc-400">
+                        <li>Automatic Seeding: Initial products, categories, coupons, and orders are seeded automatically when connected for the first time.</li>
+                        <li>Real-Time Sync: All order placements, status updates, and stock count deductions automatically write to MongoDB collections in real-time.</li>
+                        <li>High Availability: If MongoDB Atlas is offline or unconfigured, the app falls back seamlessly to in-memory state without crashing.</li>
+                      </ul>
+                    </div>
+
+                  </div>
+                )}
+
 
               </div>
 

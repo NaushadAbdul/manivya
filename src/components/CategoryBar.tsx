@@ -34,7 +34,7 @@ export const CategoryBar: React.FC = () => {
   };
 
   return (
-    <nav className="bg-black/90 backdrop-blur-md border-b border-zinc-800 py-3 px-4 sm:px-6 overflow-x-auto no-scrollbar sticky top-[57px] z-30 transition-colors">
+    <nav className="bg-[#4A3060]/90 backdrop-blur-md border-b border-purple-900/40 py-2.5 px-3 sm:px-6 overflow-x-auto no-scrollbar sticky top-[82px] sm:top-[88px] z-30 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 min-w-max">
         
         {/* All Products Tab */}

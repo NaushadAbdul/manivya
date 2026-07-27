@@ -26,7 +26,7 @@ import { motion, AnimatePresence } from 'motion/react';
 const STATUS_STEPS: { status: OrderStatus; label: string; desc: string }[] = [
   { status: 'placed', label: 'Order Confirmed', desc: 'Received at MANIVYA Enterprise Hub' },
   { status: 'packing', label: 'Packing Items', desc: 'Cold chain & safety checked at Gajuwaka' },
-  { status: 'out_for_delivery', label: 'Out for Delivery', desc: 'Rider is on the way (10 mins ETA)' },
+  { status: 'out_for_delivery', label: 'Out for Delivery', desc: 'Rider is on the way to your location' },
   { status: 'delivered', label: 'Delivered', desc: 'Handed over safely at doorstep' }
 ];
 
@@ -235,7 +235,7 @@ export const OrdersModal: React.FC = () => {
 
                     {/* Google Maps From and To Live Tracking */}
                     <DeliveryMapTracker
-                      fromAddress="MANIVYA Express Hub, VIP Road, Siripuram, Visakhapatnam - 530003"
+                      fromAddress="25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026"
                       toAddress={`${order.deliveryAddress.fullAddress}, ${order.deliveryAddress.area}, ${order.deliveryAddress.pincode}`}
                       orderId={order.id}
                       etaMinutes={order.deliveryEtaMinutes || 8}

@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
+  auth, 
+  googleProvider, 
+  signInWithPopup, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  db,
+  doc,
+  getDoc,
+  setDoc
+} from '../lib/firebase';
+import { 
   Product, 
   CategoryInfo, 
   CartItem, 
@@ -26,6 +37,7 @@ interface StoreContextType {
   selectedCategory: ProductCategory | 'all';
   searchQuery: string;
   selectedLocation: LocationArea;
+  deliveryLocations: LocationArea[];
   businessInfo: BusinessInfo;
   currentUser: User | null;
   adminToken: string | null;
@@ -45,6 +57,9 @@ interface StoreContextType {
   setSelectedCategory: (cat: ProductCategory | 'all') => void;
   setSearchQuery: (query: string) => void;
   setSelectedLocation: (loc: LocationArea) => void;
+  addDeliveryLocation: (location: Omit<LocationArea, 'id'>) => void;
+  updateDeliveryLocation: (id: string, location: Partial<LocationArea>) => void;
+  deleteDeliveryLocation: (id: string) => void;
   setIsCartOpen: (open: boolean) => void;
   setIsSearchOpen: (open: boolean) => void;
   setIsLocationModalOpen: (open: boolean) => void;
@@ -68,6 +83,7 @@ interface StoreContextType {
 
   // Auth & Admin
   loginUser: (user: User) => void;
+  loginWithGoogle: () => Promise<void>;
   logoutUser: () => void;
   adminLogin: (token: string) => void;
   adminLogout: () => void;
@@ -106,7 +122,42 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<LocationArea>(INITIAL_LOCATIONS[0]);
+  const [deliveryLocations, setDeliveryLocations] = useState<LocationArea[]>(() => {
+    try {
+      const saved = localStorage.getItem('manivya_delivery_locations');
+      return saved ? JSON.parse(saved) : INITIAL_LOCATIONS;
+    } catch {
+      return INITIAL_LOCATIONS;
+    }
+  });
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(INITIAL_BUSINESS_INFO);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('manivya_delivery_locations', JSON.stringify(deliveryLocations));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [deliveryLocations]);
+
+  const addDeliveryLocation = (loc: Omit<LocationArea, 'id'>) => {
+    const newLoc: LocationArea = {
+      ...loc,
+      id: `loc-${Date.now()}`
+    };
+    setDeliveryLocations(prev => [newLoc, ...prev]);
+    addToast(`New delivery hub "${loc.name}" added successfully by Owner!`, 'success');
+  };
+
+  const updateDeliveryLocation = (id: string, updated: Partial<LocationArea>) => {
+    setDeliveryLocations(prev => prev.map(l => l.id === id ? { ...l, ...updated } : l));
+    addToast('Delivery location updated!', 'info');
+  };
+
+  const deleteDeliveryLocation = (id: string) => {
+    setDeliveryLocations(prev => prev.filter(l => l.id !== id));
+    addToast('Delivery location removed!', 'info');
+  };
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -311,6 +362,74 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isWishlisted = (productId: string) => wishlist.includes(productId);
 
+  // Firebase Auth State Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        try {
+          const userDocRef = doc(db, 'users', fbUser.uid);
+          const userSnap = await getDoc(userDocRef);
+          
+          let appUser: User;
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            appUser = {
+              id: fbUser.uid,
+              name: data.displayName || fbUser.displayName || 'Valued Customer',
+              email: fbUser.email || '',
+              phone: data.phone || '7207554777',
+              role: data.role || 'customer',
+              addresses: data.addresses || [
+                {
+                  id: `addr-${fbUser.uid}`,
+                  title: 'Home',
+                  fullAddress: data.address || '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
+                  area: 'Gajuwaka Bypass Road',
+                  pincode: data.pincode || '530026',
+                  isDefault: true
+                }
+              ],
+              createdAt: data.createdAt || new Date().toISOString()
+            };
+          } else {
+            appUser = {
+              id: fbUser.uid,
+              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Customer',
+              email: fbUser.email || '',
+              phone: '7207554777',
+              role: 'customer',
+              addresses: [
+                {
+                  id: `addr-${fbUser.uid}`,
+                  title: 'Home',
+                  fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
+                  area: 'Gajuwaka Bypass Road',
+                  pincode: '530026',
+                  isDefault: true
+                }
+              ],
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(userDocRef, {
+              userId: fbUser.uid,
+              displayName: appUser.name,
+              email: appUser.email,
+              phone: appUser.phone,
+              addresses: appUser.addresses,
+              role: 'customer',
+              createdAt: appUser.createdAt
+            }, { merge: true });
+          }
+          setCurrentUser(appUser);
+          localStorage.setItem('manivya_user', JSON.stringify(appUser));
+        } catch (err) {
+          console.error('Firestore user sync error:', err);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Auth Operations
   const loginUser = (user: User) => {
     setCurrentUser(user);
@@ -318,7 +437,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addToast(`Welcome back, ${user.name}!`, 'success');
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      addToast(`Google Sign-In successful! Welcome, ${user.displayName || user.email}! 🎉`, 'success');
+      setIsAuthModalOpen(false);
+    } catch (err: any) {
+      console.error('Google Sign-In error:', err);
+      addToast(err.message || 'Failed to sign in with Google', 'error');
+    }
+  };
+
   const logoutUser = () => {
+    firebaseSignOut(auth).catch(() => {});
     setCurrentUser(null);
     localStorage.removeItem('manivya_user');
     addToast('Logged out successfully', 'info');
@@ -346,6 +478,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         selectedCategory,
         searchQuery,
         selectedLocation,
+        deliveryLocations,
         businessInfo,
         currentUser,
         adminToken,
@@ -363,6 +496,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setSelectedCategory,
         setSearchQuery,
         setSelectedLocation,
+        addDeliveryLocation,
+        updateDeliveryLocation,
+        deleteDeliveryLocation,
         setIsCartOpen,
         setIsSearchOpen,
         setIsLocationModalOpen,
@@ -383,6 +519,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isWishlisted,
 
         loginUser,
+        loginWithGoogle,
         logoutUser,
         adminLogin,
         adminLogout,

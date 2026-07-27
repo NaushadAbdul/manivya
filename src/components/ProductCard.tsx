@@ -33,13 +33,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       className="group relative bg-zinc-900/90 rounded-2xl border border-zinc-800 p-3 flex flex-col justify-between shadow-xs hover:shadow-xl hover:border-zinc-500 transition-all overflow-hidden"
     >
       {/* Top Badges & Wishlist */}
-      <div className="relative w-full aspect-square bg-zinc-950 rounded-xl overflow-hidden mb-3">
+      <div 
+        onClick={() => setQuickViewProduct(product)}
+        className="relative w-full aspect-square bg-zinc-950 rounded-xl overflow-hidden mb-2.5 sm:mb-3 cursor-pointer group/img"
+      >
         
         {/* Product Image with Zoom */}
         <img
           src={product.image}
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+          className="w-full h-full object-cover group-hover/img:scale-108 transition-transform duration-500 opacity-90 group-hover/img:opacity-100"
           loading="lazy"
         />
 
@@ -49,30 +52,33 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             e.stopPropagation();
             toggleWishlist(product.id);
           }}
-          className="absolute top-2 right-2 p-2 rounded-full bg-zinc-900/90 border border-zinc-800 backdrop-blur-xs text-zinc-300 hover:text-white hover:scale-110 shadow-sm transition-all"
+          className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 rounded-full bg-zinc-900/90 border border-zinc-800 backdrop-blur-xs text-zinc-300 hover:text-white hover:scale-110 shadow-sm transition-all z-10"
         >
-          <Heart className={`w-3.5 h-3.5 ${wishlisted ? 'fill-red-500 text-red-500' : ''}`} />
+          <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${wishlisted ? 'fill-red-500 text-red-500' : ''}`} />
         </button>
 
-        {/* ETA & Discount Badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
-          <span className="px-2 py-0.5 rounded-md bg-black/80 border border-zinc-800 text-zinc-100 font-mono text-[10px] font-bold flex items-center gap-1 shadow-sm backdrop-blur-xs">
+        {/* Express & Discount Badges */}
+        <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex flex-col gap-1 z-10">
+          <span className="px-1.5 py-0.5 sm:px-2 rounded-md bg-black/80 border border-zinc-800 text-zinc-100 font-mono text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shadow-sm backdrop-blur-xs">
             <Zap className="w-2.5 h-2.5 text-emerald-400 fill-emerald-400" />
-            <span>{product.deliveryTimeMinutes} MINS</span>
+            <span>EXPRESS</span>
           </span>
 
           {discountPercent > 0 && (
-            <span className="px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/30 text-blue-400 font-mono text-[10px] font-bold shadow-sm">
+            <span className="px-1.5 py-0.5 sm:px-2 rounded-md bg-blue-500/20 border border-blue-500/30 text-blue-400 font-mono text-[9px] sm:text-[10px] font-bold shadow-sm">
               {discountPercent}% OFF
             </span>
           )}
         </div>
 
         {/* Quick View Button Overlay */}
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity hidden sm:flex items-center justify-center">
           <button
-            onClick={() => setQuickViewProduct(product)}
-            className="px-3.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-900 text-xs font-bold flex items-center gap-1.5 shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-all hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              setQuickViewProduct(product);
+            }}
+            className="px-3.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-900 text-xs font-bold flex items-center gap-1.5 shadow-lg transform translate-y-2 group-hover/img:translate-y-0 transition-all hover:bg-white"
           >
             <Eye className="w-3.5 h-3.5" /> Quick View
           </button>

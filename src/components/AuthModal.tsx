@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { User } from '../types';
+import { api } from '../services/api';
 import { X, User as UserIcon, Lock, Phone, MapPin, CheckCircle2, LogOut, KeyRound, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,7 +12,7 @@ interface StoredAccount {
 }
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, setIsAuthModalOpen, currentUser, loginUser, logoutUser, addToast } = useStore();
+  const { isAuthModalOpen, setIsAuthModalOpen, currentUser, loginUser, loginWithGoogle, logoutUser, addToast } = useStore();
   const [isSignup, setIsSignup] = useState(false);
   
   // Login fields
@@ -84,24 +85,49 @@ export const AuthModal: React.FC = () => {
     ];
   };
 
-  const handleQuickDemo = (demoUsername: string) => {
-    setUsername(demoUsername);
-    setPassword('user123');
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUsername = username.trim().toLowerCase();
 
     if (!cleanUsername || !password) {
-      addToast('Please enter both username and password', 'error');
+      addToast('Please enter both username/email and password', 'error');
       return;
     }
 
-    const accounts = getStoredAccounts();
-
     if (isSignup) {
-      // Check if username already exists
+      try {
+        const userEmail = email.trim() || (cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@manivya.com`);
+        const res = await api.userRegister({
+          name: name.trim() || cleanUsername,
+          email: userEmail,
+          password: password,
+          phone: phone.trim() || '7207554777'
+        });
+
+        const registeredUser: User = {
+          ...res.user,
+          addresses: [
+            {
+              id: `addr-${Date.now()}`,
+              title: 'Home',
+              fullAddress: address.trim() || '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
+              area: 'Visakhapatnam',
+              pincode: pincode.trim() || '530026',
+              isDefault: true
+            }
+          ]
+        };
+
+        loginUser(registeredUser);
+        addToast(`Account created & authenticated successfully! 🎉`, 'success');
+        setIsAuthModalOpen(false);
+        return;
+      } catch (err: any) {
+        // Fallback to local accounts if needed
+        console.warn('Backend register attempt:', err.message);
+      }
+
+      const accounts = getStoredAccounts();
       const existing = accounts.find(a => a.username.toLowerCase() === cleanUsername);
       if (existing) {
         addToast(`Username "${cleanUsername}" is already taken. Please choose another or login.`, 'error');
@@ -141,9 +167,24 @@ export const AuthModal: React.FC = () => {
       setIsAuthModalOpen(false);
 
     } else {
-      // Login mode
+      // Login mode - try API first
+      try {
+        const userEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@manivya.com`;
+        const res = await api.userLogin(userEmail, password);
+        if (res.user) {
+          loginUser(res.user);
+          addToast(`Logged in successfully! 👋`, 'success');
+          setIsAuthModalOpen(false);
+          return;
+        }
+      } catch (err: any) {
+        console.warn('Backend login attempt:', err.message);
+      }
+
+      // Fallback local accounts check
+      const accounts = getStoredAccounts();
       const account = accounts.find(
-        a => a.username.toLowerCase() === cleanUsername && a.password === password
+        a => (a.username.toLowerCase() === cleanUsername || (a.user.email && a.user.email.toLowerCase() === cleanUsername)) && a.password === password
       );
 
       if (account) {
@@ -151,7 +192,7 @@ export const AuthModal: React.FC = () => {
         addToast(`Logged in as @${account.username}! 👋`, 'success');
         setIsAuthModalOpen(false);
       } else {
-        addToast('Invalid username or password. Check demo credentials below.', 'error');
+        addToast('Invalid credentials. Please check your username/email and password.', 'error');
       }
     }
   };
@@ -233,35 +274,33 @@ export const AuthModal: React.FC = () => {
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   {isSignup 
-                    ? 'Register with a unique username and password for 10-min delivery' 
-                    : 'Sign in with your username & password to place orders & track delivery'}
+                    ? 'Register with a unique username or sign in with Google to place orders' 
+                    : 'Sign in with Google or your username & password to track delivery'}
                 </p>
               </div>
 
-              {/* Demo credentials hint */}
-              {!isSignup && (
-                <div className="p-2.5 bg-blue-950/40 rounded-xl border border-blue-800/40 text-[11px]">
-                  <div className="text-blue-300 font-bold flex items-center gap-1 mb-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Quick Demo Accounts:
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickDemo('naushad')}
-                      className="px-2 py-1 rounded bg-blue-900/60 hover:bg-blue-800/80 text-blue-200 font-mono font-bold border border-blue-700/50"
-                    >
-                      @naushad (pass123)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickDemo('kalyan')}
-                      className="px-2 py-1 rounded bg-blue-900/60 hover:bg-blue-800/80 text-blue-200 font-mono font-bold border border-blue-700/50"
-                    >
-                      @kalyan (pass123)
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Google Sign-In Button */}
+              <button
+                type="button"
+                onClick={loginWithGoogle}
+                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 font-bold text-sm shadow-md flex items-center justify-center gap-3 transition-all border border-zinc-200"
+              >
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                Continue with Google (Firebase)
+              </button>
+
+              <div className="flex items-center my-2">
+                <div className="flex-grow border-t border-zinc-800"></div>
+                <span className="shrink-0 mx-3 text-[10px] font-mono font-bold text-zinc-500 uppercase">OR WITH USERNAME</span>
+                <div className="flex-grow border-t border-zinc-800"></div>
+              </div>
+
+
 
               <div className="space-y-3">
                 {/* Username */}

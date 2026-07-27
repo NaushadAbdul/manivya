@@ -6,7 +6,14 @@ import { MapPin, Navigation, Check, X, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const LocationModal: React.FC = () => {
-  const { isLocationModalOpen, setIsLocationModalOpen, selectedLocation, setSelectedLocation, addToast } = useStore();
+  const { 
+    isLocationModalOpen, 
+    setIsLocationModalOpen, 
+    selectedLocation, 
+    setSelectedLocation, 
+    deliveryLocations, 
+    addToast 
+  } = useStore();
   const [isDetecting, setIsDetecting] = useState(false);
 
   if (!isLocationModalOpen) return null;
@@ -17,21 +24,23 @@ export const LocationModal: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         () => {
           setIsDetecting(false);
-          // Set to default Gajuwaka hub
-          setSelectedLocation(INITIAL_LOCATIONS[0]);
-          addToast('Detected location: Gajuwaka Bypass Road Hub (530026)', 'success');
+          const activeLoc = deliveryLocations[0] || INITIAL_LOCATIONS[0];
+          setSelectedLocation(activeLoc);
+          addToast(`Detected location: ${activeLoc.name} (${activeLoc.pincode})`, 'success');
           setIsLocationModalOpen(false);
         },
         () => {
           setIsDetecting(false);
-          addToast('GPS permission denied. Selected default Gajuwaka Hub.', 'info');
-          setSelectedLocation(INITIAL_LOCATIONS[0]);
+          const activeLoc = deliveryLocations[0] || INITIAL_LOCATIONS[0];
+          addToast(`GPS permission denied. Selected ${activeLoc.name}.`, 'info');
+          setSelectedLocation(activeLoc);
           setIsLocationModalOpen(false);
         }
       );
     } else {
       setIsDetecting(false);
-      setSelectedLocation(INITIAL_LOCATIONS[0]);
+      const activeLoc = deliveryLocations[0] || INITIAL_LOCATIONS[0];
+      setSelectedLocation(activeLoc);
       setIsLocationModalOpen(false);
     }
   };
@@ -83,12 +92,15 @@ export const LocationModal: React.FC = () => {
             <span>{isDetecting ? 'Detecting Current Location...' : 'Use Current GPS Location'}</span>
           </button>
 
-          <div className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-500 mb-2">
-            Serviceable Express Hubs
+          <div className="flex items-center justify-between text-xs font-mono font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+            <span>Owner-Added Serviceable Hubs</span>
+            <span className="text-[10px] text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full bg-blue-500/10">
+              Google Maps Enabled
+            </span>
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-            {INITIAL_LOCATIONS.map((loc, locIdx) => {
+            {deliveryLocations.map((loc, locIdx) => {
               const isSelected = selectedLocation.id === loc.id;
               return (
                 <button
@@ -110,7 +122,7 @@ export const LocationModal: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-xs text-zinc-400">
-                        {loc.area} • ETA: <span className="font-semibold text-emerald-400">{loc.deliveryEta}</span>
+                        {loc.area} • <span className="font-semibold text-emerald-400">Serviceable Hub</span>
                       </div>
                     </div>
                   </div>

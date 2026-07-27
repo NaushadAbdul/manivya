@@ -76,7 +76,7 @@ export interface Address {
   isDefault?: boolean;
 }
 
-export type OrderStatus = 'placed' | 'packing' | 'out_for_delivery' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'confirmed' | 'placed' | 'packing' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'failed';
 
 export interface Order {
   id: string;
@@ -84,6 +84,7 @@ export interface Order {
   userName: string;
   userPhone: string;
   userEmail?: string;
+  idempotencyKey?: string;
   items: {
     productId: string;
     productName: string;
@@ -100,8 +101,8 @@ export interface Order {
   discountAmount: number;
   couponCodeApplied?: string;
   grandTotal: number;
-  paymentMethod: 'UPI' | 'Razorpay' | 'Card' | 'COD';
-  paymentStatus: 'paid' | 'pending';
+  paymentMethod: 'UPI' | 'Razorpay' | 'Card' | 'COD' | string;
+  paymentStatus: 'paid' | 'pending' | 'failed';
   orderStatus: OrderStatus;
   createdAt: string;
   deliveryEtaMinutes: number;
@@ -164,4 +165,6 @@ export interface LocationArea {
   pincode: string;
   deliveryEta: string;
   isServiceable: boolean;
+  lat?: number;
+  lng?: number;
 }

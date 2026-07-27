@@ -1,5 +1,6 @@
 import React from 'react';
 import { Order } from '../types';
+import { DeliveryMapTracker } from './DeliveryMapTracker';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -97,30 +98,101 @@ export const OrderNotificationModal: React.FC<OrderNotificationModalProps> = ({
           <div className="mt-5 space-y-3 bg-zinc-950 p-4 rounded-2xl border border-zinc-800 text-xs">
             {isPlaced ? (
               <>
-                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
-                  <span className="text-zinc-400 font-mono">Estimated Delivery:</span>
-                  <span className="font-extrabold text-blue-400 flex items-center gap-1 font-mono">
-                    <Clock className="w-3.5 h-3.5" /> Cold-Chain Express Delivery
-                  </span>
+                {/* Warm Greeting Message Banner */}
+                <div className="p-3 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-blue-500/20 border border-emerald-500/40 rounded-xl text-center space-y-1">
+                  <p className="text-sm font-black text-emerald-300">
+                    Order placed thank you , Visit again 😊🙏🏻
+                  </p>
+                  <p className="text-[11px] text-zinc-300">
+                    Your fresh daily essentials & dairy order is confirmed and being packed!
+                  </p>
                 </div>
 
-                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800/80">
-                  <span className="text-zinc-400 font-mono">Contact Mobile:</span>
-                  <span className="font-bold text-white font-mono flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-emerald-400" /> +91 {order.userPhone || '7207554777'}
+                {/* Delivery Progress Steps */}
+                <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 space-y-2">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase block">
+                    Delivery Updates Tracker
                   </span>
+                  <div className="grid grid-cols-4 gap-1 text-center">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-[10px]">
+                      1. Placed
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold text-[10px] animate-pulse">
+                      2. Packing
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-zinc-800 text-zinc-500 text-[10px]">
+                      3. Transit
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-zinc-800 text-zinc-500 text-[10px]">
+                      4. Delivered
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-start justify-between pb-2.5 border-b border-zinc-800/80">
-                  <span className="text-zinc-400 font-mono shrink-0 mr-2">Delivery Address:</span>
-                  <span className="font-medium text-zinc-200 text-right truncate max-w-[200px]">
-                    {order.deliveryAddress?.fullAddress || 'Visakhapatnam'}
+                {/* Auto Google Maps Directions & Live Route Tracker */}
+                <DeliveryMapTracker
+                  fromAddress="25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026"
+                  toAddress={order.deliveryAddress?.fullAddress || 'Door No. 25-1-13, Gajuwaka Bypass Road, Visakhapatnam - 530026'}
+                  orderId={order.id}
+                  etaMinutes={12}
+                />
+
+                {/* User Personal Details */}
+                <div className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800/80 space-y-1.5">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase block">
+                    Customer & Address Details
                   </span>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400 font-mono">Mobile Contact:</span>
+                    <span className="font-bold text-white font-mono flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-emerald-400" /> +91 {order.userPhone || '7207554777'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <span className="text-zinc-400 font-mono shrink-0 mr-2">Home Address:</span>
+                    <span className="font-semibold text-zinc-200 text-right text-[11px] leading-tight">
+                      {order.deliveryAddress?.fullAddress || 'Door No. 25-1-13, Gajuwaka Bypass Road, Visakhapatnam'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
+                    <span className="text-zinc-400 font-mono">Payment Mode:</span>
+                    <span className="font-bold text-blue-400 uppercase font-mono px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20">
+                      {order.paymentMethod || 'UPI'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 font-mono">Grand Total:</span>
-                  <span className="font-black text-white font-mono text-sm">₹{order.grandTotal || 0}</span>
+                {/* Ordered Items Summary */}
+                {order.items && order.items.length > 0 && (
+                  <div className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800/80 space-y-2">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase block">
+                      Ordered Products ({order.items.reduce((acc: number, i: any) => acc + (i.quantity || 1), 0)})
+                    </span>
+                    <div className="max-h-36 overflow-y-auto divide-y divide-zinc-800/60 pr-1">
+                      {order.items.map((item: any, idx: number) => (
+                        <div key={`modal-item-${idx}`} className="py-1.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {item.image && (
+                              <img src={item.image} alt={item.productName} className="w-8 h-8 rounded-lg object-cover bg-zinc-800 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-bold text-white text-[11px] truncate">{item.productName}</p>
+                              <p className="text-[10px] text-zinc-400 font-mono">{item.quantity} x ₹{item.price}</p>
+                            </div>
+                          </div>
+                          <span className="font-bold text-emerald-400 text-xs shrink-0 font-mono">₹{item.price * item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1 font-mono">
+                  <span className="text-zinc-400 font-mono">Grand Total Paid:</span>
+                  <span className="font-black text-emerald-400 font-mono text-base">₹{order.grandTotal || 0}</span>
                 </div>
               </>
             ) : (

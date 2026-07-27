@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { api } from '../services/api';
 import { OrderNotificationModal } from './OrderNotificationModal';
+import { GoogleMapsAddressPicker } from './GoogleMapsAddressPicker';
+import { OnlinePaymentModal } from './OnlinePaymentModal';
+import { OrderReviewModal } from './OrderReviewModal';
+import { Order } from '../types';
 import confetti from 'canvas-confetti';
 import { 
   X, 
@@ -19,7 +23,8 @@ import {
   Clock,
   Sparkles,
   Heart,
-  Phone
+  Phone,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -48,9 +53,27 @@ export const CartDrawer: React.FC = () => {
   // User Mobile Contact Number for delivery rider contact
   const [contactPhone, setContactPhone] = useState(currentUser?.phone || '7207554777');
 
+  // Address and Google Maps Location state
+  const [selectedAddressData, setSelectedAddressData] = useState({
+    city: 'Visakhapatnam',
+    doorNo: '25-1-13',
+    street: 'Gajuwaka Bypass Road',
+    landmark: '',
+    fullAddress: 'Door No. 25-1-13, Gajuwaka Bypass Road, Visakhapatnam - 530026',
+    area: 'Visakhapatnam',
+    pincode: '530026',
+    lat: 17.6888,
+    lng: 83.2185
+  });
+
+  // Intermediate Order Confirmation & Review Modal State
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+
   // Order Confirmation Pop-Up Reminder Modal State
-  const [confirmedOrder, setConfirmedOrder] = useState<any | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isOnlinePaymentModalOpen, setIsOnlinePaymentModalOpen] = useState(false);
 
   useEffect(() => {
     if (currentUser?.phone) {
@@ -58,7 +81,7 @@ export const CartDrawer: React.FC = () => {
     }
   }, [currentUser]);
 
-  if (!isCartOpen && !isNotificationOpen) return null;
+  if (!isCartOpen && !isNotificationOpen && !isOnlinePaymentModalOpen && !isReviewModalOpen) return null;
 
   // Calculate bill breakdown
   const freeShippingThreshold = 299;
@@ -86,18 +109,54 @@ export const CartDrawer: React.FC = () => {
     setCouponInput('');
   };
 
-  const handlePlaceOrder = async () => {
-    if (cart.length === 0) return;
-    setIsPlacingOrder(true);
+  // Step 1 Validation & Open Intermediate Review State
+  const handleProceedToReview = () => {
+    // 1. Validate Cart items
+    if (cart.length === 0) {
+      addToast('Your cart is empty. Please add items to proceed.', 'error');
+      return;
+    }
 
-    const finalPhone = contactPhone.trim() || currentUser?.phone || '7207554777';
+    // 2. Validate Contact Mobile
+    const cleanPhone = contactPhone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      addToast('Please enter a valid 10-digit mobile number for delivery rider contact.', 'error');
+      return;
+    }
+
+    // 3. Validate Delivery Address
+    if (!selectedAddressData.fullAddress || selectedAddressData.fullAddress.trim().length < 5) {
+      addToast('Please provide a complete delivery address with street and door number.', 'error');
+      return;
+    }
+
+    if (!selectedAddressData.pincode || selectedAddressData.pincode.trim().length < 5) {
+      addToast('Please enter a valid postal pincode for your location.', 'error');
+      return;
+    }
+
+    // Open Intermediate Order Review Modal
+    setIsReviewModalOpen(true);
+  };
+
+  // Step 2: Confirm Review -> Create Pending Order & Route COD or Online Payment
+  const handleConfirmOrderReview = async (chosenPaymentMethod: 'UPI' | 'Razorpay' | 'Card' | 'COD') => {
+    if (isPlacingOrder) return; // Prevent duplicate clicks
+    setIsPlacingOrder(true);
+    setPaymentMethod(chosenPaymentMethod);
+
+    const finalPhone = contactPhone.replace(/\D/g, '') || currentUser?.phone || '7207554777';
+    const idempotencyKey = `chk-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
     try {
-      const newOrder = await api.createOrder({
+      // Create Pending Order on Backend
+      const createdPendingOrder = await api.createOrder({
         userId: currentUser?.id,
         userName: currentUser?.name || 'Valued Customer',
         userPhone: finalPhone,
         userEmail: currentUser?.email || '',
+        idempotencyKey,
+        initialStatus: 'pending',
         items: cart.map(i => ({
           productId: i.product.id,
           productName: i.product.name,
@@ -107,18 +166,67 @@ export const CartDrawer: React.FC = () => {
           quantity: i.quantity,
           image: i.product.image
         })),
-        deliveryAddress: currentUser?.addresses[0] || {
-          id: 'addr-default',
-          title: 'Home',
-          fullAddress: `25-1-13, Gajuwaka Bypass Road, ${selectedLocation.name}`,
-          area: selectedLocation.area,
-          pincode: selectedLocation.pincode
+        deliveryAddress: {
+          id: `addr-${Date.now()}`,
+          title: selectedAddressData.city || 'Home',
+          fullAddress: selectedAddressData.fullAddress || `25-1-13, Gajuwaka Bypass Road, ${selectedLocation.name}`,
+          area: selectedAddressData.area || selectedLocation.area,
+          pincode: selectedAddressData.pincode || selectedLocation.pincode
         },
-        paymentMethod,
+        paymentMethod: chosenPaymentMethod,
         couponCodeApplied: appliedCoupon || undefined
       });
 
-      // Fire celebratory confetti!
+      setPendingOrder(createdPendingOrder);
+
+      if (chosenPaymentMethod === 'COD') {
+        // Finalize COD Order on Backend
+        const confirmed = await api.confirmOrder(createdPendingOrder.id, {
+          paymentMethod: 'COD',
+          paymentStatus: 'pending'
+        });
+
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+
+        clearCart();
+        setIsReviewModalOpen(false);
+        setIsCartOpen(false);
+        setPendingOrder(null);
+        setConfirmedOrder(confirmed);
+        setIsNotificationOpen(true);
+        addToast(`🛍️ Order #${confirmed.id} placed successfully! Total ₹${confirmed.grandTotal} ⚡`, 'success');
+        await refreshOrders();
+      } else {
+        // Online Payment (UPI / Razorpay): Switch to Payment Modal
+        setIsReviewModalOpen(false);
+        setIsOnlinePaymentModalOpen(true);
+      }
+    } catch (err: any) {
+      addToast(err.message || 'Failed to initialize order checkout', 'error');
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  // Called when Online Payment Verification succeeds
+  const handleOnlinePaymentSuccess = async (txnRef: string) => {
+    if (!pendingOrder) {
+      addToast('Active checkout session expired or missing', 'error');
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    try {
+      const confirmed = await api.confirmOrder(pendingOrder.id, {
+        txnRef,
+        paymentStatus: 'paid',
+        paymentMethod: paymentMethod
+      });
+
       confetti({
         particleCount: 120,
         spread: 80,
@@ -126,19 +234,33 @@ export const CartDrawer: React.FC = () => {
       });
 
       clearCart();
+      setIsOnlinePaymentModalOpen(false);
       setIsCartOpen(false);
-      
-      // Trigger Pop-Up Reminder Modal
-      setConfirmedOrder(newOrder);
+      setPendingOrder(null);
+      setConfirmedOrder(confirmed);
       setIsNotificationOpen(true);
-
-      addToast(`🛍️ Order #${newOrder.id} placed successfully! Total ₹${newOrder.grandTotal}. Arriving in 10 mins ⚡`, 'success');
+      addToast(`🛍️ Payment Verified! Order #${confirmed.id} placed successfully! Total ₹${confirmed.grandTotal} ⚡`, 'success');
       await refreshOrders();
     } catch (err: any) {
-      addToast(err.message || 'Order placement failed', 'error');
+      addToast(err.message || 'Payment verification failed', 'error');
+      throw err;
     } finally {
       setIsPlacingOrder(false);
     }
+  };
+
+  // Called when user cancels or closes Online Payment Modal
+  const handleOnlinePaymentCancel = async () => {
+    if (pendingOrder) {
+      try {
+        await api.cancelOrder(pendingOrder.id, 'User cancelled online payment step');
+      } catch (e) {
+        console.warn('Cancel order error:', e);
+      }
+      setPendingOrder(null);
+    }
+    setIsOnlinePaymentModalOpen(false);
+    addToast('Checkout process was cancelled. Order was not created.', 'info');
   };
 
   return (
@@ -155,8 +277,8 @@ export const CartDrawer: React.FC = () => {
           <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950">
             <div>
               <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-blue-400 uppercase">
-                <Clock className="w-3.5 h-3.5" />
-                <span>Delivery in {selectedLocation.deliveryEta}</span>
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Hub: {selectedLocation.name}</span>
               </div>
               <h2 className="text-base font-extrabold text-white flex items-center gap-2">
                 <span>My Cart ({cart.length})</span>
@@ -179,7 +301,7 @@ export const CartDrawer: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-white">Your Cart is Empty</h3>
               <p className="text-xs text-zinc-400 mt-1 max-w-xs">
-                Explore Amul milk, ice creams, stationery, custom t-shirts & mugs delivered in 10 minutes.
+                Explore Amul milk, ice creams, stationery, custom t-shirts & mugs delivered directly to your doorstep.
               </p>
               <button
                 onClick={() => setIsCartOpen(false)}
@@ -329,6 +451,13 @@ export const CartDrawer: React.FC = () => {
                 </div>
               </div>
 
+              {/* Google Maps Delivery Address Selector */}
+              <GoogleMapsAddressPicker
+                initialCity={selectedLocation.name || 'Visakhapatnam'}
+                initialFullAddress={currentUser?.addresses[0]?.fullAddress || '25-1-13, Gajuwaka Bypass Road'}
+                onAddressSelect={setSelectedAddressData}
+              />
+
               {/* Bill Summary Breakdown */}
               <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2 text-xs">
                 <div className="font-mono font-bold text-zinc-500 uppercase text-[10px]">
@@ -444,16 +573,20 @@ export const CartDrawer: React.FC = () => {
           {cart.length > 0 && (
             <div className="p-4 border-t border-zinc-800 bg-zinc-950 shadow-xl">
               <button
-                onClick={handlePlaceOrder}
+                onClick={handleProceedToReview}
                 disabled={isPlacingOrder}
-                className="w-full py-3.5 px-6 rounded-2xl bg-white hover:bg-zinc-200 text-black font-extrabold text-sm sm:text-base flex items-center justify-between shadow-xl transition-all active:scale-98 disabled:opacity-50"
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-extrabold text-sm sm:text-base flex items-center justify-between shadow-xl transition-all active:scale-98 disabled:opacity-50"
               >
                 <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-mono font-bold opacity-70">GRAND TOTAL</span>
+                  <span className="text-[10px] font-mono font-bold opacity-80 uppercase">Total Payable</span>
                   <span className="font-mono text-lg leading-tight">₹{grandTotal}</span>
                 </div>
                 <div className="flex items-center gap-1.5 font-mono">
-                  <span>{isPlacingOrder ? 'PLACING...' : 'PLACE ORDER'}</span>
+                  <span>
+                    {isPlacingOrder 
+                      ? 'PROCESSING...' 
+                      : 'REVIEW & CONFIRM ORDER'}
+                  </span>
                   <ChevronRight className="w-5 h-5" />
                 </div>
               </button>
@@ -463,7 +596,45 @@ export const CartDrawer: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* Pop-Up Reminder Modal on Order Placement */}
+      {/* Intermediate Order Review Modal */}
+      <OrderReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        onConfirmOrder={handleConfirmOrderReview}
+        isProcessing={isPlacingOrder}
+        cartItems={cart}
+        customerName={currentUser?.name || 'Valued Customer'}
+        customerPhone={contactPhone.replace(/\D/g, '') || currentUser?.phone || '7207554777'}
+        deliveryAddress={{
+          doorNo: selectedAddressData.doorNo,
+          street: selectedAddressData.street,
+          area: selectedAddressData.area || selectedLocation.area,
+          pincode: selectedAddressData.pincode || selectedLocation.pincode,
+          fullAddress: selectedAddressData.fullAddress || `25-1-13, Gajuwaka Bypass Road, ${selectedLocation.name}`
+        }}
+        cartItemTotal={cartItemTotal}
+        deliveryFee={deliveryFee}
+        handlingFee={handlingFee}
+        driverTip={driverTip}
+        discountAmount={discountAmount}
+        couponCode={appliedCoupon}
+        grandTotal={grandTotal}
+        initialPaymentMethod={paymentMethod}
+      />
+
+      {/* Online Payment Modal for UPI / Razorpay / QR */}
+      <OnlinePaymentModal
+        isOpen={isOnlinePaymentModalOpen}
+        onClose={handleOnlinePaymentCancel}
+        onCancel={handleOnlinePaymentCancel}
+        amount={grandTotal}
+        paymentMethod={paymentMethod}
+        userPhone={contactPhone.trim() || currentUser?.phone || '7207554777'}
+        orderId={pendingOrder?.id}
+        onPaymentSuccess={handleOnlinePaymentSuccess}
+      />
+
+      {/* Pop-Up Reminder Modal on Final Order Placement */}
       {confirmedOrder && (
         <OrderNotificationModal
           isOpen={isNotificationOpen}

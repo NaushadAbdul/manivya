@@ -81,7 +81,7 @@ export const ProductDetailModal: React.FC = () => {
 
                 <div className="absolute top-3 left-3 bg-black/80 border border-zinc-800 text-white font-mono text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 backdrop-blur-xs">
                   <Zap className="w-3 h-3 text-emerald-400" />
-                  <span>{product.deliveryTimeMinutes} MINS</span>
+                  <span>MANIVYA EXPRESS</span>
                 </div>
               </div>
 

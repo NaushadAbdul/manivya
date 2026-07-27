@@ -6,7 +6,7 @@ export const INITIAL_CATEGORIES: CategoryInfo[] = [
     name: 'Dairy & Milk',
     iconName: 'Milk',
     badge: 'Fresh Daily',
-    description: 'Amul fresh milk, dahi, butter, paneer & cheese delivered in 10 mins.',
+    description: 'Amul fresh milk, dahi, butter, paneer & cheese delivered directly to your doorstep.',
     image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80'
   },
   {
