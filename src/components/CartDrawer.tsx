@@ -178,33 +178,9 @@ export const CartDrawer: React.FC = () => {
       });
 
       setPendingOrder(createdPendingOrder);
-
-      if (chosenPaymentMethod === 'COD') {
-        // Finalize COD Order on Backend
-        const confirmed = await api.confirmOrder(createdPendingOrder.id, {
-          paymentMethod: 'COD',
-          paymentStatus: 'pending'
-        });
-
-        confetti({
-          particleCount: 120,
-          spread: 80,
-          origin: { y: 0.6 }
-        });
-
-        clearCart();
-        setIsReviewModalOpen(false);
-        setIsCartOpen(false);
-        setPendingOrder(null);
-        setConfirmedOrder(confirmed);
-        setIsNotificationOpen(true);
-        addToast(`🛍️ Order #${confirmed.id} placed successfully! Total ₹${confirmed.grandTotal} ⚡`, 'success');
-        await refreshOrders();
-      } else {
-        // Online Payment (UPI / Razorpay): Switch to Payment Modal
-        setIsReviewModalOpen(false);
-        setIsOnlinePaymentModalOpen(true);
-      }
+      // Switch to Payment Modal for Admin QR scanning/confirmation
+      setIsReviewModalOpen(false);
+      setIsOnlinePaymentModalOpen(true);
     } catch (err: any) {
       addToast(err.message || 'Failed to initialize order checkout', 'error');
     } finally {
@@ -301,7 +277,7 @@ export const CartDrawer: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-white">Your Cart is Empty</h3>
               <p className="text-xs text-zinc-400 mt-1 max-w-xs">
-                Explore Amul milk, ice creams, stationery, custom t-shirts & mugs delivered directly to your doorstep.
+                Explore our catalog of dairy, ice creams, stationery & custom products delivered directly to your doorstep.
               </p>
               <button
                 onClick={() => setIsCartOpen(false)}
@@ -454,7 +430,7 @@ export const CartDrawer: React.FC = () => {
               {/* Google Maps Delivery Address Selector */}
               <GoogleMapsAddressPicker
                 initialCity={selectedLocation.name || 'Visakhapatnam'}
-                initialFullAddress={currentUser?.addresses[0]?.fullAddress || '25-1-13, Gajuwaka Bypass Road'}
+                initialFullAddress={currentUser?.addresses[0]?.fullAddress || `${selectedLocation.area || selectedLocation.name}, Visakhapatnam - ${selectedLocation.pincode}`}
                 onAddressSelect={setSelectedAddressData}
               />
 
@@ -622,10 +598,10 @@ export const CartDrawer: React.FC = () => {
         initialPaymentMethod={paymentMethod}
       />
 
-      {/* Online Payment Modal for UPI / Razorpay / QR */}
+      {/* Online Payment Modal for UPI / QR */}
       <OnlinePaymentModal
         isOpen={isOnlinePaymentModalOpen}
-        onClose={handleOnlinePaymentCancel}
+        onClose={() => handleOnlinePaymentSuccess(`UPI-7207554777-${Date.now()}`)}
         onCancel={handleOnlinePaymentCancel}
         amount={grandTotal}
         paymentMethod={paymentMethod}

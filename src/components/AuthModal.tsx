@@ -12,9 +12,26 @@ interface StoredAccount {
 }
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, setIsAuthModalOpen, currentUser, loginUser, loginWithGoogle, logoutUser, addToast } = useStore();
+  const { 
+    isAuthModalOpen, 
+    setIsAuthModalOpen, 
+    currentUser, 
+    loginUser, 
+    loginWithGoogle, 
+    logoutUser, 
+    updateUserAddress,
+    selectedLocation,
+    setIsLocationModalOpen,
+    addToast 
+  } = useStore();
   const [isSignup, setIsSignup] = useState(false);
   
+  // Address editing in profile
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [customStreet, setCustomStreet] = useState('');
+  const [customArea, setCustomArea] = useState('');
+  const [customPincode, setCustomPincode] = useState('');
+
   // Login fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -235,20 +252,103 @@ export const AuthModal: React.FC = () => {
               </div>
 
               {/* Delivery Address Card */}
-              <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800 text-xs space-y-1.5">
+              <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800 text-xs space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="font-mono font-bold text-zinc-500 uppercase text-[10px]">Saved Delivery Address</p>
-                  <span className="text-[10px] font-mono text-zinc-400 font-bold">Default</span>
-                </div>
-                <div className="flex items-start gap-2 text-zinc-200">
-                  <MapPin className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-white">{currentUser.addresses[0]?.title || 'Home'}</p>
-                    <p className="text-zinc-400 text-[11px] leading-snug mt-0.5">
-                      {currentUser.addresses[0]?.fullAddress}, Visakhapatnam - {currentUser.addresses[0]?.pincode}
-                    </p>
+                  <div className="flex items-center gap-1.5 text-zinc-400 font-mono font-bold uppercase text-[10px]">
+                    <MapPin className="w-3.5 h-3.5 text-red-400" />
+                    <span>Saved Delivery Address</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setIsAuthModalOpen(false);
+                        setIsLocationModalOpen(true);
+                      }}
+                      className="text-[10px] font-mono text-blue-400 hover:underline font-bold"
+                    >
+                      Change Hub
+                    </button>
+                    <span className="text-zinc-600">•</span>
+                    <button
+                      onClick={() => {
+                        setCustomStreet(currentUser.addresses?.[0]?.fullAddress || `${selectedLocation.area}, Visakhapatnam`);
+                        setCustomArea(currentUser.addresses?.[0]?.area || selectedLocation.area || selectedLocation.name);
+                        setCustomPincode(currentUser.addresses?.[0]?.pincode || selectedLocation.pincode);
+                        setIsEditingAddress(!isEditingAddress);
+                      }}
+                      className="text-[10px] font-mono text-emerald-400 hover:underline font-bold"
+                    >
+                      {isEditingAddress ? 'Cancel' : 'Edit'}
+                    </button>
                   </div>
                 </div>
+
+                {isEditingAddress ? (
+                  <div className="space-y-2 pt-1 border-t border-zinc-800">
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-400 uppercase">Street / Door No. / Address</label>
+                      <input
+                        type="text"
+                        value={customStreet}
+                        onChange={(e) => setCustomStreet(e.target.value)}
+                        placeholder="e.g. Flat 201, Street Name"
+                        className="w-full mt-1 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs text-white font-medium outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-400 uppercase">Area / Landmark</label>
+                        <input
+                          type="text"
+                          value={customArea}
+                          onChange={(e) => setCustomArea(e.target.value)}
+                          placeholder="e.g. Durgavanipalem"
+                          className="w-full mt-1 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs text-white font-medium outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-400 uppercase">Pincode</label>
+                        <input
+                          type="text"
+                          value={customPincode}
+                          onChange={(e) => setCustomPincode(e.target.value)}
+                          placeholder="530026"
+                          className="w-full mt-1 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs text-white font-mono font-bold outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!customStreet.trim()) {
+                          addToast('Please enter an address', 'error');
+                          return;
+                        }
+                        const fullAddr = customStreet.includes('Visakhapatnam') 
+                          ? customStreet 
+                          : `${customStreet}, ${customArea || selectedLocation.name}, Visakhapatnam - ${customPincode || '530026'}`;
+                        updateUserAddress({
+                          fullAddress: fullAddr,
+                          area: customArea || selectedLocation.area || 'Visakhapatnam',
+                          pincode: customPincode || selectedLocation.pincode || '530026',
+                          title: 'Location Address'
+                        });
+                        setIsEditingAddress(false);
+                      }}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-md mt-1"
+                    >
+                      Save Delivery Address
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-zinc-200">
+                    <p className="font-bold text-white text-sm">
+                      {currentUser.addresses?.[0]?.area || selectedLocation.area || selectedLocation.name}
+                    </p>
+                    <p className="text-zinc-400 text-[11px] leading-snug mt-0.5">
+                      {currentUser.addresses?.[0]?.fullAddress || `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 border-t border-zinc-800/80 flex gap-2">

@@ -129,14 +129,6 @@ export const OrderNotificationModal: React.FC<OrderNotificationModalProps> = ({
                   </div>
                 </div>
 
-                {/* Auto Google Maps Directions & Live Route Tracker */}
-                <DeliveryMapTracker
-                  fromAddress="25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026"
-                  toAddress={order.deliveryAddress?.fullAddress || 'Door No. 25-1-13, Gajuwaka Bypass Road, Visakhapatnam - 530026'}
-                  orderId={order.id}
-                  etaMinutes={12}
-                />
-
                 {/* User Personal Details */}
                 <div className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800/80 space-y-1.5">
                   <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase block">
@@ -238,27 +230,15 @@ export const OrderNotificationModal: React.FC<OrderNotificationModalProps> = ({
 
           {/* Action Buttons */}
           <div className="mt-5 space-y-2">
-            {isPlaced && onOpenTracking && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenTracking();
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all"
-              >
-                <Navigation className="w-4 h-4" /> Track Live on Google Maps
-              </button>
-            )}
-
             <button
               onClick={onClose}
-              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition-colors ${
+              className={`w-full py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors ${
                 isPlaced
-                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                  : 'bg-white hover:bg-zinc-200 text-black'
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-lg'
+                  : 'bg-white hover:bg-zinc-200 text-black font-extrabold'
               }`}
             >
-              Close Reminder Window
+              Close Window
             </button>
           </div>
         </motion.div>

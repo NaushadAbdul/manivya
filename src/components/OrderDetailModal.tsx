@@ -234,20 +234,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   )}
                 </div>
               )}
-
-              {/* Live Map View Component */}
-              {!isCancelled && (
-                <div className="mt-3">
-                  <DeliveryMapTracker
-                    fromAddress="25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026"
-                    toAddress={`${order.deliveryAddress.fullAddress}, ${order.deliveryAddress.area}, ${order.deliveryAddress.pincode}`}
-                    orderId={order.id}
-                    etaMinutes={order.deliveryEtaMinutes || 8}
-                    riderName={order.driverName || "Ramu K. (MANIVYA Rider)"}
-                    riderPhone={order.driverPhone || "7207554777"}
-                  />
-                </div>
-              )}
             </div>
 
             {/* Delivery Address Details */}

@@ -73,7 +73,7 @@ export const Footer: React.FC = () => {
             </div>
 
             <p className="text-zinc-400 text-xs leading-relaxed">
-              Visakhapatnam’s premier multi-enterprise quick commerce store delivering Amul dairy, ice creams, Classmate stationery, custom t-shirts, magic mugs, bottles & memory foam pillows.
+              Visakhapatnam’s premier multi-enterprise quick commerce store delivering fresh dairy, frozen treats, stationery, custom printing & essential lifestyle goods.
             </p>
 
             <div className="pt-2 space-y-1.5 text-zinc-300 font-mono">

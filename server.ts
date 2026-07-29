@@ -69,10 +69,24 @@ function getGeminiAI() {
 // REST API ROUTES
 
 // MongoDB Atlas Connection & Diagnostics API
+app.get('/api/ip', (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
+  res.json({
+    requestedIp: '49.47.248.103/32',
+    userIp: clientIp || '49.47.248.103',
+    whitelistCidr: '49.47.248.103/32',
+    allowAnyCidr: '0.0.0.0/0',
+    notice: 'To connect MongoDB Atlas, add 49.47.248.103/32 or 0.0.0.0/0 under Security > Network Access in MongoDB Atlas console.'
+  });
+});
+
 app.get('/api/mongodb/status', async (req, res) => {
   const status = getMongoStatus();
+  const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
   res.json({
     databaseType: 'MongoDB Atlas',
+    whitelistedIp: '49.47.248.103/32',
+    clientIp: clientIp || '49.47.248.103',
     ...status,
     collections: {
       productsCount: products.length,

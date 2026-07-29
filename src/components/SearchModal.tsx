@@ -61,7 +61,7 @@ export const SearchModal: React.FC = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for Amul milk, ice creams, notebooks, t-shirts, mugs..."
+              placeholder="Search for milk, ice creams, notebooks, t-shirts, mugs..."
               className="flex-1 bg-transparent border-none outline-none text-white placeholder-zinc-500 text-sm sm:text-base font-medium"
               autoFocus
             />

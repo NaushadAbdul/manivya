@@ -85,6 +85,7 @@ interface StoreContextType {
   loginUser: (user: User) => void;
   loginWithGoogle: () => Promise<void>;
   logoutUser: () => void;
+  updateUserAddress: (newAddress: { fullAddress: string; area: string; pincode: string; title?: string }) => void;
   adminLogin: (token: string) => void;
   adminLogout: () => void;
 
@@ -121,7 +122,35 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState<LocationArea>(INITIAL_LOCATIONS[0]);
+  const [selectedLocation, setSelectedLocationState] = useState<LocationArea>(INITIAL_LOCATIONS[0]);
+
+  // Wrap location selector to automatically update and save the user's active delivery address according to location
+  const setSelectedLocation = (loc: LocationArea) => {
+    setSelectedLocationState(loc);
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      const newAddressItem = {
+        id: prev.addresses?.[0]?.id || `addr-${Date.now()}`,
+        title: loc.name || 'Selected Hub',
+        fullAddress: `${loc.area || loc.name}, Visakhapatnam - ${loc.pincode}`,
+        area: loc.area || loc.name,
+        pincode: loc.pincode,
+        isDefault: true
+      };
+      const updatedAddresses = [newAddressItem, ...(prev.addresses?.slice(1) || [])];
+      const updatedUser = { ...prev, addresses: updatedAddresses };
+      try {
+        localStorage.setItem('manivya_user', JSON.stringify(updatedUser));
+      } catch (e) {
+        console.error(e);
+      }
+      if (auth.currentUser) {
+        setDoc(doc(db, 'users', auth.currentUser.uid), { addresses: updatedAddresses }, { merge: true }).catch(() => {});
+      }
+      return updatedUser;
+    });
+  };
+
   const [deliveryLocations, setDeliveryLocations] = useState<LocationArea[]>(() => {
     try {
       const saved = localStorage.getItem('manivya_delivery_locations');
@@ -170,11 +199,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         role: 'customer',
         addresses: [
           {
-            id: 'addr-1',
-            title: 'Home',
-            fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-            area: 'Gajuwaka Bypass Road',
-            pincode: '530026',
+            id: 'addr-guest',
+            title: 'Location Address',
+            fullAddress: `${INITIAL_LOCATIONS[0].area}, Visakhapatnam - ${INITIAL_LOCATIONS[0].pincode}`,
+            area: INITIAL_LOCATIONS[0].area,
+            pincode: INITIAL_LOCATIONS[0].pincode,
             isDefault: true
           }
         ],
@@ -382,10 +411,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               addresses: data.addresses || [
                 {
                   id: `addr-${fbUser.uid}`,
-                  title: 'Home',
-                  fullAddress: data.address || '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-                  area: 'Gajuwaka Bypass Road',
-                  pincode: data.pincode || '530026',
+                  title: 'Location Address',
+                  fullAddress: data.address || `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
+                  area: selectedLocation.area,
+                  pincode: data.pincode || selectedLocation.pincode,
                   isDefault: true
                 }
               ],
@@ -401,10 +430,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               addresses: [
                 {
                   id: `addr-${fbUser.uid}`,
-                  title: 'Home',
-                  fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-                  area: 'Gajuwaka Bypass Road',
-                  pincode: '530026',
+                  title: 'Location Address',
+                  fullAddress: `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
+                  area: selectedLocation.area,
+                  pincode: selectedLocation.pincode,
                   isDefault: true
                 }
               ],
@@ -428,7 +457,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [selectedLocation]);
 
   // Auth Operations
   const loginUser = (user: User) => {
@@ -437,15 +466,65 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addToast(`Welcome back, ${user.name}!`, 'success');
   };
 
+  const updateUserAddress = (newAddr: { fullAddress: string; area: string; pincode: string; title?: string }) => {
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      const updatedAddr = {
+        id: prev.addresses?.[0]?.id || `addr-${Date.now()}`,
+        title: newAddr.title || 'Saved Delivery Address',
+        fullAddress: newAddr.fullAddress,
+        area: newAddr.area,
+        pincode: newAddr.pincode,
+        isDefault: true
+      };
+      const updatedAddresses = [updatedAddr, ...(prev.addresses?.slice(1) || [])];
+      const updatedUser = { ...prev, addresses: updatedAddresses };
+      try {
+        localStorage.setItem('manivya_user', JSON.stringify(updatedUser));
+      } catch (e) {
+        console.error(e);
+      }
+      if (auth.currentUser) {
+        setDoc(doc(db, 'users', auth.currentUser.uid), { addresses: updatedAddresses }, { merge: true }).catch(() => {});
+      }
+      return updatedUser;
+    });
+    addToast(`Delivery address updated according to location: ${newAddr.area || newAddr.pincode}`, 'success');
+  };
+
+  const isSigningInRef = useRef(false);
+
   const loginWithGoogle = async () => {
+    if (isSigningInRef.current) {
+      console.warn('Google Sign-In is already in progress.');
+      return;
+    }
+    isSigningInRef.current = true;
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       addToast(`Google Sign-In successful! Welcome, ${user.displayName || user.email}! 🎉`, 'success');
       setIsAuthModalOpen(false);
     } catch (err: any) {
-      console.error('Google Sign-In error:', err);
-      addToast(err.message || 'Failed to sign in with Google', 'error');
+      console.warn('Google Sign-In caught error:', err);
+      const code = err?.code || '';
+      const message = err?.message || String(err || '');
+
+      if (code === 'auth/popup-blocked' || message.includes('popup-blocked')) {
+        addToast('Sign-In popup was blocked by your browser. Please allow popups for this site or open in a new tab.', 'error');
+      } else if (code === 'auth/cancelled-popup-request' || message.includes('cancelled-popup-request')) {
+        console.warn('Google Sign-In popup request was superseded.');
+      } else if (code === 'auth/popup-closed-by-user' || message.includes('popup-closed-by-user')) {
+        addToast('Sign-In popup was closed before completing.', 'info');
+      } else if (message.includes('Pending promise was never set') || message.includes('INTERNAL ASSERTION FAILED')) {
+        console.warn('Firebase Auth internal assertion handled safely.');
+      } else {
+        addToast(message || 'Failed to sign in with Google', 'error');
+      }
+    } finally {
+      setTimeout(() => {
+        isSigningInRef.current = false;
+      }, 1000);
     }
   };
 
@@ -521,6 +600,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loginUser,
         loginWithGoogle,
         logoutUser,
+        updateUserAddress,
         adminLogin,
         adminLogout,
 

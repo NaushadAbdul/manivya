@@ -610,7 +610,7 @@ export const INITIAL_BUSINESS_INFO: BusinessInfo = {
   isOpen: true,
   deliveryNotice: '⚡ Delivering Express Cold-Chain across Gajuwaka, Pedagantyada & Visakhapatnam Hubs!',
   bannerTitle: 'MANIVYA Cold-Chain Express Store',
-  bannerSubtitle: 'Amul Dairy, Ice Creams, Notebooks, Custom T-Shirts, Magic Mugs, Bottles & Pillows at your doorstep!'
+  bannerSubtitle: 'Fresh Dairy, Ice Creams, Stationery, Custom Merchandise & Essentials delivered to your doorstep!'
 };
 
 export const INITIAL_LOCATIONS: LocationArea[] = [

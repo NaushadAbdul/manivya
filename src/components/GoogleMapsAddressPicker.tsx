@@ -39,14 +39,36 @@ const DEFAULT_COORDS = { lat: 17.6888, lng: 83.2185 }; // Visakhapatnam / Gajuwa
 
 export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
   initialCity = 'Visakhapatnam',
-  initialFullAddress = '25-1-13, Gajuwaka Bypass Road',
+  initialFullAddress = '',
   onAddressSelect
 }) => {
   const [city, setCity] = useState(initialCity);
-  const [doorNo, setDoorNo] = useState('25-1-13');
-  const [streetAddress, setStreetAddress] = useState('Gajuwaka Bypass Road');
+  const [doorNo, setDoorNo] = useState(() => {
+    if (initialFullAddress && initialFullAddress.includes('Door No.')) {
+      const match = initialFullAddress.match(/Door No\.\s*([^,]+)/i);
+      if (match) return match[1];
+    }
+    return '';
+  });
+  const [streetAddress, setStreetAddress] = useState(() => {
+    if (initialFullAddress) {
+      const cleaned = initialFullAddress
+        .replace(/Door No\.[^,]+,\s*/i, '')
+        .replace(/\s*-\s*\d{6}/, '')
+        .replace(/,\s*Visakhapatnam/i, '')
+        .trim();
+      if (cleaned) return cleaned;
+    }
+    return initialCity || 'Visakhapatnam';
+  });
   const [landmark, setLandmark] = useState('');
-  const [pincode, setPincode] = useState('530026');
+  const [pincode, setPincode] = useState(() => {
+    if (initialFullAddress) {
+      const pinMatch = initialFullAddress.match(/\b\d{6}\b/);
+      if (pinMatch) return pinMatch[0];
+    }
+    return '530026';
+  });
   const [mapCenter, setMapCenter] = useState(DEFAULT_COORDS);
   const [markerPos, setMarkerPos] = useState(DEFAULT_COORDS);
   const [isLocating, setIsLocating] = useState(false);

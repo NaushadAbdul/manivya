@@ -46,7 +46,7 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes timer
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const storeUpiId = "manivya.enterprises@ybl";
+  const storeUpiId = "7207554777@sbi";
   const storePhone = "7207554777";
   const storeName = "MANIVYA ENTERPRISES";
 
@@ -63,12 +63,30 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleClose = () => {
+  const handleCancelClick = () => {
     if (isVerifying) return;
     if (onCancel) {
       onCancel();
     } else {
       onClose();
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    setIsVerifying(true);
+    setErrorMessage(null);
+    try {
+      const ref = utrNumber.trim() || `UPI${Date.now()}`;
+      await onPaymentSuccess(ref);
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Payment verification failed. Please try again.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -84,28 +102,9 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleConfirmPayment = async () => {
-    setIsVerifying(true);
-    setErrorMessage(null);
-
-    try {
-      const ref = utrNumber.trim() || `TXN${Date.now()}`;
-      await onPaymentSuccess(ref);
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Payment verification failed. Please try again.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // Generate Google Chart API QR Code for standard UPI string
+  // Generate QR Code for UPI string with pa=7207554777@sbi
   const upiString = `upi://pay?pa=${storeUpiId}&pn=${encodeURIComponent(storeName)}&am=${amount}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiString)}&color=000000&bgcolor=ffffff`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiString)}&color=000000&bgcolor=ffffff`;
 
   return (
     <AnimatePresence>
@@ -130,16 +129,17 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
                   </span>
                 </h3>
                 <p className="text-[11px] text-blue-100 flex items-center gap-1 font-mono">
-                  <Clock className="w-3 h-3 text-amber-300" /> Expires in: {formatTime(timeLeft)}
+                  <Clock className="w-3 h-3 text-amber-300" /> Session: {formatTime(timeLeft)}
                 </p>
               </div>
             </div>
 
             <button
               type="button"
-              onClick={handleClose}
+              onClick={handleCancelClick}
               disabled={isVerifying}
               className="p-2 rounded-full hover:bg-white/20 text-white transition-colors disabled:opacity-50"
+              title="Cancel & Close"
             >
               <X className="w-5 h-5" />
             </button>
@@ -168,178 +168,42 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
               </div>
             </div>
 
-            {/* Payment Method Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-zinc-950 rounded-xl border border-zinc-800 text-xs font-bold font-mono">
-              <button
-                type="button"
-                onClick={() => setActiveTab('qr')}
-                className={`py-2 rounded-lg flex items-center justify-center gap-1 transition-all ${
-                  activeTab === 'qr' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>Scan QR</span>
-              </button>
+            {/* Scan QR Code Section */}
+            <div className="space-y-3 text-center">
+              <div className="p-4 bg-white rounded-2xl inline-block shadow-xl border-4 border-blue-500/30">
+                <img
+                  src={qrCodeUrl}
+                  alt="Scan UPI QR Code to Pay"
+                  className="w-48 h-48 object-contain mx-auto"
+                />
+                <p className="text-[11px] font-mono font-bold text-zinc-900 mt-2">
+                  Scan with PhonePe, GPay, Paytm, BHIM or YONO
+                </p>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('upi_apps')}
-                className={`py-2 rounded-lg flex items-center justify-center gap-1 transition-all ${
-                  activeTab === 'upi_apps' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>UPI Apps</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('card')}
-                className={`py-2 rounded-lg flex items-center justify-center gap-1 transition-all ${
-                  activeTab === 'card' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <CreditCard className="w-3.5 h-3.5" />
-                <span>Cards / Net</span>
-              </button>
-            </div>
-
-            {/* TAB 1: Scan QR Code */}
-            {activeTab === 'qr' && (
-              <div className="space-y-3 text-center">
-                <div className="p-4 bg-white rounded-2xl inline-block shadow-xl border-4 border-blue-500/30">
-                  <img
-                    src={qrCodeUrl}
-                    alt="Scan UPI QR Code to Pay"
-                    className="w-44 h-44 object-contain mx-auto"
-                  />
-                  <p className="text-[11px] font-mono font-bold text-zinc-900 mt-2">
-                    Scan with PhonePe, GPay, Paytm or BHIM
+              {/* UPI ID / VPA Section */}
+              <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800 flex items-center justify-between text-xs">
+                <div className="text-left">
+                  <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">UPI ID / VPA</p>
+                  <p className="font-mono font-extrabold text-white text-sm sm:text-base tracking-wide text-emerald-400">
+                    {storeUpiId}
                   </p>
                 </div>
-
-                {/* Copy UPI VPA */}
-                <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 flex items-center justify-between text-xs">
-                  <div className="text-left">
-                    <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">UPI ID / VPA</p>
-                    <p className="font-mono font-bold text-white">{storeUpiId}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyUpi}
-                    className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[11px] font-mono font-bold flex items-center gap-1 transition-all"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copied ? 'Copied!' : 'Copy ID'}</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyUpi}
+                  className="px-3.5 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shrink-0"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'Copied!' : 'Copy ID'}</span>
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* TAB 2: UPI Apps Direct Links */}
-            {activeTab === 'upi_apps' && (
-              <div className="space-y-2.5">
-                <p className="text-[11px] font-mono text-zinc-400">
-                  Select your preferred UPI Payment App to pay ₹{amount} directly:
-                </p>
-
-                <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-                  <a
-                    href={`phonepe://pay?pa=${storeUpiId}&pn=${encodeURIComponent(storeName)}&am=${amount}&cu=INR`}
-                    className="p-3 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/30 rounded-2xl text-purple-200 flex items-center gap-2.5 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black text-xs">
-                      🟪
-                    </div>
-                    <div className="text-left">
-                      <p className="text-white font-extrabold">PhonePe</p>
-                      <p className="text-[10px] text-purple-300 font-mono">Instant Pay</p>
-                    </div>
-                  </a>
-
-                  <a
-                    href={`gpay://upi/pay?pa=${storeUpiId}&pn=${encodeURIComponent(storeName)}&am=${amount}&cu=INR`}
-                    className="p-3 bg-blue-950/60 hover:bg-blue-900/80 border border-blue-500/30 rounded-2xl text-blue-200 flex items-center gap-2.5 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs">
-                      🟦
-                    </div>
-                    <div className="text-left">
-                      <p className="text-white font-extrabold">Google Pay</p>
-                      <p className="text-[10px] text-blue-300 font-mono">GPay Tap</p>
-                    </div>
-                  </a>
-
-                  <a
-                    href={`paytmmp://pay?pa=${storeUpiId}&pn=${encodeURIComponent(storeName)}&am=${amount}&cu=INR`}
-                    className="p-3 bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/30 rounded-2xl text-cyan-200 flex items-center gap-2.5 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-black text-xs">
-                      🟦
-                    </div>
-                    <div className="text-left">
-                      <p className="text-white font-extrabold">Paytm UPI</p>
-                      <p className="text-[10px] text-cyan-300 font-mono">Wallet / UPI</p>
-                    </div>
-                  </a>
-
-                  <a
-                    href={upiString}
-                    className="p-3 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/30 rounded-2xl text-emerald-200 flex items-center gap-2.5 transition-all"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs">
-                      🟩
-                    </div>
-                    <div className="text-left">
-                      <p className="text-white font-extrabold">BHIM / Any UPI</p>
-                      <p className="text-[10px] text-emerald-300 font-mono">Auto App</p>
-                    </div>
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: Cards / Netbanking Simulation */}
-            {activeTab === 'card' && (
-              <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-3 text-xs">
-                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                  <span>Razorpay Card & Netbanking Gateway</span>
-                  <span className="text-emerald-400 font-bold">Encrypted</span>
-                </div>
-
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Card Number (4532 •••• •••• 8920)"
-                    className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono outline-none focus:border-blue-500"
-                    defaultValue="4532 9821 3410 8920"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono outline-none focus:border-blue-500"
-                      defaultValue="12/28"
-                    />
-                    <input
-                      type="password"
-                      placeholder="CVV"
-                      className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono outline-none focus:border-blue-500"
-                      defaultValue="888"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-zinc-500 italic">
-                  * All debit, credit cards & major Indian banks (SBI, HDFC, ICICI, Axis) supported via Razorpay.
-                </p>
-              </div>
-            )}
-
-            {/* Optional UTR / Reference Number Verification Input */}
+            {/* Optional UTR / Reference Number Input */}
             <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1.5">
               <label className="block text-[10px] font-mono font-bold text-zinc-400 uppercase">
-                12-Digit UTR / Transaction Ref No. (Optional)
+                12-DIGIT UTR / TRANSACTION REF NO. (OPTIONAL)
               </label>
               <input
                 type="text"
@@ -373,8 +237,8 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
               </button>
             </div>
 
-            <p className="text-center text-[10px] text-zinc-500 font-mono">
-              Order confirmation popup will appear immediately after payment verification.
+            <p className="text-center text-[11px] text-zinc-400 font-mono">
+              After scanning and making payment to <strong className="text-white">{storeUpiId}</strong>, click button above to place order.
             </p>
 
           </div>

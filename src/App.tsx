@@ -116,7 +116,7 @@ const MainContent: React.FC = () => {
                 : currentCategoryObj?.name || selectedCategory}
             </h2>
             <p className="text-xs text-zinc-400 mt-0.5">
-              {currentCategoryObj?.description || 'Browse Amul dairy, ice creams, Classmate notebooks, t-shirts, magic mugs, bottles & pillows.'}
+              {currentCategoryObj?.description || ''}
             </p>
           </div>
 
