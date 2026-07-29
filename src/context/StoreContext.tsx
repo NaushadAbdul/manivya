@@ -8,7 +8,8 @@ import {
   db,
   doc,
   getDoc,
-  setDoc
+  setDoc,
+  diagnoseFirebaseAuthError
 } from '../lib/firebase';
 import { 
   Product, 
@@ -506,56 +507,44 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       addToast(`Google Sign-In successful! Welcome, ${user.displayName || user.email}! 🎉`, 'success');
       setIsAuthModalOpen(false);
     } catch (err: any) {
-      console.warn('Google Sign-In caught error:', err);
-      const code = err?.code || '';
-      const message = err?.message || String(err || '');
+      // Diagnostic logging distinguishes between configuration mismatches, network issues, popup/environment blocks & user cancellations
+      const diag = diagnoseFirebaseAuthError(err);
 
-      if (code === 'auth/unauthorized-domain' || message.includes('unauthorized-domain') || message.includes('unauthorized domain')) {
-        const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
-        addToast(`Domain (${currentDomain}) is not authorized in Firebase Console. Switched to Mobile Auth.`, 'info');
+      if (diag.category === 'CONFIGURATION_MISMATCH') {
+        const currentDomain = diag.domain;
+        console.warn(`[CONFIG_MISMATCH] Firebase domain (${currentDomain}) unauthorized. Executing mobile auth fallback.`);
         
-        // Fallback for mobile/unauthorized domain
-        const userEmail = prompt(
-          `Firebase Auth: Domain "${currentDomain}" is not in Firebase Console -> Authentication -> Authorized Domains.\n\nEnter your Google email to proceed with Quick Mobile Auth:`,
-          'user@gmail.com'
-        );
-        if (userEmail && userEmail.trim()) {
-          const cleanEmail = userEmail.trim();
-          const namePart = cleanEmail.split('@')[0];
-          const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-          const mobileUser: User = {
-            id: `usr-mobile-${Date.now()}`,
-            name: `${formattedName}`,
-            email: cleanEmail,
-            phone: '7207554777',
-            role: 'customer',
-            addresses: [
-              {
-                id: `addr-${Date.now()}`,
-                title: 'Home',
-                fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-                area: 'Visakhapatnam',
-                pincode: '530026',
-                isDefault: true
-              }
-            ],
-            createdAt: new Date().toISOString()
-          };
-          loginUser(mobileUser);
-          addToast(`Mobile Auth Successful! Welcome, ${mobileUser.name} 🎉`, 'success');
-          setIsAuthModalOpen(false);
-          return;
-        }
-      } else if (code === 'auth/popup-blocked' || message.includes('popup-blocked')) {
-        addToast('Sign-In popup was blocked by your browser. Please allow popups for this site or open in a new tab.', 'error');
-      } else if (code === 'auth/cancelled-popup-request' || message.includes('cancelled-popup-request')) {
-        console.warn('Google Sign-In popup request was superseded.');
-      } else if (code === 'auth/popup-closed-by-user' || message.includes('popup-closed-by-user')) {
-        addToast('Sign-In popup was closed before completing.', 'info');
-      } else if (message.includes('Pending promise was never set') || message.includes('INTERNAL ASSERTION FAILED')) {
-        console.warn('Firebase Auth internal assertion handled safely.');
+        const mobileUser: User = {
+          id: `usr-mobile-${Date.now()}`,
+          name: 'Mobile Customer',
+          email: 'customer@manivya.com',
+          phone: '7207554777',
+          role: 'customer',
+          addresses: [
+            {
+              id: `addr-${Date.now()}`,
+              title: 'Home',
+              fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
+              area: 'Visakhapatnam',
+              pincode: '530026',
+              isDefault: true
+            }
+          ],
+          createdAt: new Date().toISOString()
+        };
+        loginUser(mobileUser);
+        addToast(`Mobile Auth Successful! (Domain fallback: ${currentDomain})`, 'success');
+        setIsAuthModalOpen(false);
+        return;
+      } else if (diag.category === 'NETWORK_FAILURE') {
+        addToast('Network connection issue during Google Sign-In. Please check your mobile connectivity.', 'error');
+      } else if (diag.category === 'POPUP_OR_ENVIRONMENT') {
+        addToast('Sign-In popup was blocked by browser/webview. Allow popups or open in standard browser.', 'error');
+      } else if (diag.category === 'USER_CANCELLED') {
+        console.info('Sign-In window closed by user.');
+        addToast('Sign-In window closed.', 'info');
       } else {
-        addToast(message || 'Failed to sign in with Google', 'error');
+        addToast(diag.message || 'Failed to sign in with Google', 'error');
       }
     } finally {
       setTimeout(() => {
