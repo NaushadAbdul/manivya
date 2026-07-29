@@ -533,7 +533,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           createdAt: new Date().toISOString()
         };
         loginUser(mobileUser);
-        addToast(`Mobile Auth Successful! (Domain fallback: ${currentDomain})`, 'success');
+        addToast(`Signed in successfully! Welcome! 🎉`, 'success');
         setIsAuthModalOpen(false);
         return;
       } else if (diag.category === 'NETWORK_FAILURE') {
