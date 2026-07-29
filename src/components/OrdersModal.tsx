@@ -18,7 +18,9 @@ import {
   Box,
   ChevronDown,
   XCircle,
-  Eye
+  Eye,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -33,6 +35,10 @@ export const OrdersModal: React.FC = () => {
   const { isOrdersModalOpen, setIsOrdersModalOpen, currentUser, addToCart, products, addToast } = useStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Cancellation Confirmation Dialog State
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Cancellation Pop-Up State
   const [cancelledOrder, setCancelledOrder] = useState<Order | null>(null);
@@ -56,20 +62,34 @@ export const OrdersModal: React.FC = () => {
       .finally(() => setIsLoading(false));
   };
 
-  const handleCancelOrder = async (order: Order) => {
-    if (!confirm(`Are you sure you want to cancel Order #${order.id}?`)) return;
+  const handleCancelOrder = (order: Order) => {
+    setOrderToCancel(order);
+  };
+
+  const executeCancelOrder = async () => {
+    if (!orderToCancel) return;
+    setIsCancelling(true);
 
     try {
-      await api.cancelOrder(order.id, 'Cancelled by customer');
-      setOrders(prev => prev.filter(o => o.id !== order.id));
-      if (selectedDetailOrder?.id === order.id) {
-        setSelectedDetailOrder(null);
-        setIsDetailModalOpen(false);
+      await api.cancelOrder(orderToCancel.id, 'Cancelled by customer');
+      
+      // Update order status locally to cancelled
+      const updatedOrder = { ...orderToCancel, orderStatus: 'cancelled' as OrderStatus };
+      setOrders(prev => prev.map(o => o.id === orderToCancel.id ? updatedOrder : o));
+      
+      if (selectedDetailOrder?.id === orderToCancel.id) {
+        setSelectedDetailOrder(updatedOrder);
       }
-      addToast(`🚨 Order #${order.id} was CANCELLED and deleted`, 'error');
+      
+      setCancelledOrder(updatedOrder);
+      setIsCancelModalOpen(true);
+      addToast(`🚨 Order #${orderToCancel.id} was CANCELLED successfully`, 'error');
       fetchOrders();
     } catch (err: any) {
       addToast(err.message || 'Failed to cancel order', 'error');
+    } finally {
+      setIsCancelling(false);
+      setOrderToCancel(null);
     }
   };
 
@@ -142,13 +162,13 @@ export const OrdersModal: React.FC = () => {
                 </p>
               </div>
             ) : (
-              orders.map((order) => {
+              orders.map((order, orderIdx) => {
                 const currentStep = getStepIndex(order.orderStatus);
                 const isCancelled = order.orderStatus === 'cancelled';
 
                 return (
                   <div
-                    key={order.id}
+                    key={`order-${order.id}-${orderIdx}`}
                     className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-4 shadow-xs"
                   >
                     {/* Top Order Meta */}
@@ -292,6 +312,54 @@ export const OrdersModal: React.FC = () => {
           onReorder={handleReorder}
           onCancelOrder={handleCancelOrder}
         />
+      )}
+
+      {/* Confirmation Modal before canceling order */}
+      {orderToCancel && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-center space-y-4"
+          >
+            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-white font-mono">Cancel Order #{orderToCancel.id}?</h3>
+              <p className="text-xs text-zinc-400 mt-1.5">
+                Are you sure you want to cancel this order for <span className="font-bold text-emerald-400 font-mono">₹{orderToCancel.grandTotal}</span>?
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                disabled={isCancelling}
+                onClick={() => setOrderToCancel(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition-colors"
+              >
+                Keep Order
+              </button>
+              <button
+                disabled={isCancelling}
+                onClick={executeCancelOrder}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-500/20 transition-all disabled:opacity-50"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Yes, Cancel</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );

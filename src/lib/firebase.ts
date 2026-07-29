@@ -34,7 +34,8 @@ if (typeof window !== 'undefined') {
     if (
       msg.includes('Pending promise was never set') ||
       msg.includes('cancelled-popup-request') ||
-      msg.includes('popup-blocked')
+      msg.includes('popup-blocked') ||
+      msg.includes('unauthorized-domain')
     ) {
       event.preventDefault();
       console.warn('Handled Firebase Auth async popup rejection safely:', msg);

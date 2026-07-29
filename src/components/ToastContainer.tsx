@@ -86,12 +86,12 @@ export const ToastContainer: React.FC = () => {
   return (
     <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
       <AnimatePresence>
-        {toasts.map((toast) => {
+        {toasts.map((toast, tIdx) => {
           const { cardBg, badgeBg, badgeText, Icon, iconColor, pingBg } = getToastStyleAndIcon(toast);
 
           return (
             <motion.div
-              key={toast.id}
+              key={`toast-${toast.id}-${tIdx}`}
               initial={{ opacity: 0, y: -25, scale: 0.9, x: 20 }}
               animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
               exit={{ opacity: 0, x: 60, scale: 0.85 }}

@@ -287,9 +287,9 @@ Let us know if you need bulk student discount orders!`;
 
           {/* Chat Messages Body */}
           <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-zinc-950/50 text-xs">
-            {messages.map((msg) => (
+            {messages.map((msg, msgIdx) => (
               <div
-                key={msg.id}
+                key={`chat-msg-${msg.id}-${msgIdx}`}
                 className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.sender === 'bot' && (
@@ -310,9 +310,9 @@ Let us know if you need bulk student discount orders!`;
                   {/* Product Cards in Bot Answer */}
                   {msg.suggestedProducts && msg.suggestedProducts.length > 0 && (
                     <div className="space-y-1.5 pt-1 border-t border-zinc-800">
-                      {msg.suggestedProducts.map((p) => (
+                      {msg.suggestedProducts.map((p, pIdx) => (
                         <div
-                          key={`sp-${msg.id}-${p.id}`}
+                          key={`sp-${msg.id}-${p.id}-${pIdx}`}
                           className="flex items-center justify-between p-2 rounded-xl bg-zinc-950 border border-zinc-800/80 gap-2"
                         >
                           <div className="flex items-center gap-2 min-w-0">
@@ -364,9 +364,9 @@ Let us know if you need bulk student discount orders!`;
 
           {/* Quick Questions Pills */}
           <div className="p-2 bg-zinc-900 border-t border-zinc-800/80 flex gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
-            {quickQuestions.map((q) => (
+            {quickQuestions.map((q, qIdx) => (
               <button
-                key={`qq-${q}`}
+                key={`qq-${q}-${qIdx}`}
                 onClick={() => handleSendMessage(q)}
                 className="px-2.5 py-1 rounded-full bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] whitespace-nowrap shrink-0 transition-colors font-medium"
               >

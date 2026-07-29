@@ -4,6 +4,7 @@ import { INITIAL_LOCATIONS } from '../data/initialData';
 import { LocationArea } from '../types';
 import { MapPin, Navigation, Check, X, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { performReverseGeocode } from './GoogleMapsAddressPicker';
 
 export const LocationModal: React.FC = () => {
   const { 
@@ -22,20 +23,38 @@ export const LocationModal: React.FC = () => {
     setIsDetecting(true);
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        () => {
+        async (pos) => {
+          const newLat = pos.coords.latitude;
+          const newLng = pos.coords.longitude;
           setIsDetecting(false);
-          const activeLoc = deliveryLocations[0] || INITIAL_LOCATIONS[0];
-          setSelectedLocation(activeLoc);
-          addToast(`Detected location: ${activeLoc.name} (${activeLoc.pincode})`, 'success');
+
+          const geo = await performReverseGeocode(newLat, newLng);
+          const detectedArea = geo.street || geo.city || 'Visakhapatnam';
+          const detectedPincode = geo.pincode || '530026';
+
+          const gpsLoc: LocationArea = {
+            id: `gps-${Date.now()}`,
+            name: detectedArea,
+            area: detectedArea,
+            pincode: detectedPincode,
+            deliveryEta: '10-15 mins',
+            isServiceable: true,
+            lat: newLat,
+            lng: newLng
+          };
+
+          setSelectedLocation(gpsLoc);
+          addToast(`GPS Detected Location: ${detectedArea} (${detectedPincode})`, 'success');
           setIsLocationModalOpen(false);
         },
         () => {
           setIsDetecting(false);
           const activeLoc = deliveryLocations[0] || INITIAL_LOCATIONS[0];
-          addToast(`GPS permission denied. Selected ${activeLoc.name}.`, 'info');
+          addToast(`GPS permission denied. Selected default ${activeLoc.name}.`, 'info');
           setSelectedLocation(activeLoc);
           setIsLocationModalOpen(false);
-        }
+        },
+        { timeout: 10000, enableHighAccuracy: true }
       );
     } else {
       setIsDetecting(false);
@@ -100,11 +119,11 @@ export const LocationModal: React.FC = () => {
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-            {deliveryLocations.map((loc) => {
+            {deliveryLocations.map((loc, locIdx) => {
               const isSelected = selectedLocation.id === loc.id;
               return (
                 <button
-                  key={loc.id}
+                  key={`loc-${loc.id}-${locIdx}`}
                   onClick={() => handleSelectArea(loc)}
                   className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
                     isSelected

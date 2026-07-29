@@ -91,9 +91,9 @@ export const SearchModal: React.FC = () => {
                     <span>Popular Quick Searches</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {POPULAR_SEARCHES.map((term) => (
+                    {POPULAR_SEARCHES.map((term, termIdx) => (
                       <button
-                        key={`pop-${term}`}
+                        key={`pop-${term}-${termIdx}`}
                         onClick={() => setQuery(term)}
                         className="px-3 py-1.5 rounded-full bg-zinc-800/80 hover:bg-zinc-800 hover:text-white border border-zinc-700/60 text-xs font-medium text-zinc-300 transition-colors"
                       >
@@ -108,9 +108,9 @@ export const SearchModal: React.FC = () => {
                     Trending Products Today
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {products.filter(p => p.isBestSeller || p.isTrending).slice(0, 4).map((p) => (
+                    {products.filter(p => p.isBestSeller || p.isTrending).slice(0, 4).map((p, pIdx) => (
                       <div
-                        key={`trending-${p.id}`}
+                        key={`trending-${p.id}-${pIdx}`}
                         onClick={() => {
                           setQuickViewProduct(p);
                           setIsSearchOpen(false);
@@ -142,11 +142,11 @@ export const SearchModal: React.FC = () => {
                   FOUND {filtered.length} MATCHES
                 </div>
 
-                {filtered.map((product) => {
+                {filtered.map((product, fIdx) => {
                   const qty = getItemQuantityInCart(product.id);
                   return (
                     <div
-                      key={`search-${product.id}`}
+                      key={`search-${product.id}-${fIdx}`}
                       className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-zinc-800 hover:border-zinc-600 bg-zinc-950/60 transition-all"
                     >
                       <div 

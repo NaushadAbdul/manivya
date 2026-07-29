@@ -394,6 +394,17 @@ export const AuthModal: React.FC = () => {
                 Continue with Google (Firebase)
               </button>
 
+              {/* Mobile / Unauthorized domain quick note */}
+              <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 text-[10px] text-zinc-400 space-y-1">
+                <div className="flex items-center justify-between text-zinc-300 font-bold font-mono">
+                  <span>📱 Mobile / Web Domain Note:</span>
+                  <span className="text-blue-400 truncate max-w-[150px]">{typeof window !== 'undefined' ? window.location.hostname : ''}</span>
+                </div>
+                <p className="leading-tight text-zinc-500">
+                  If Google Auth reports <span className="text-amber-400 font-mono">auth/unauthorized-domain</span> on mobile preview, add <span className="text-zinc-300 font-mono font-bold">{typeof window !== 'undefined' ? window.location.hostname : 'domain'}</span> in Firebase Console &gt; Auth &gt; Authorized Domains, or sign in below with username/password.
+                </p>
+              </div>
+
               <div className="flex items-center my-2">
                 <div className="flex-grow border-t border-zinc-800"></div>
                 <span className="shrink-0 mx-3 text-[10px] font-mono font-bold text-zinc-500 uppercase">OR WITH USERNAME</span>

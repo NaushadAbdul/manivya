@@ -37,6 +37,88 @@ const VISAKHA_AREA_MAP: Record<string, { pincode: string; lat: number; lng: numb
 
 const DEFAULT_COORDS = { lat: 17.6888, lng: 83.2185 }; // Visakhapatnam / Gajuwaka default
 
+// Exportable Reverse Geocoding utility
+export const performReverseGeocode = async (lat: number, lng: number): Promise<{
+  doorNo: string;
+  street: string;
+  city: string;
+  pincode: string;
+  landmark: string;
+}> => {
+  let doorNo = '';
+  let street = '';
+  let city = 'Visakhapatnam';
+  let pincode = '530026';
+  let landmark = '';
+
+  // 1. Try Google Maps Geocoder if loaded on window
+  if (typeof window !== 'undefined' && (window as any).google?.maps?.Geocoder) {
+    try {
+      const geocoder = new (window as any).google.maps.Geocoder();
+      const response = await geocoder.geocode({ location: { lat, lng } });
+      if (response && response.results && response.results.length > 0) {
+        const result = response.results[0];
+        let streetNumber = '';
+        let routeName = '';
+        let sublocality = '';
+        let localityName = '';
+        let postalCode = '';
+        let poi = '';
+
+        for (const comp of result.address_components) {
+          const types = comp.types || [];
+          if (types.includes('street_number') || types.includes('premise')) streetNumber = comp.long_name;
+          if (types.includes('route')) routeName = comp.long_name;
+          if (types.includes('sublocality') || types.includes('sublocality_level_1') || types.includes('neighborhood')) {
+            sublocality = comp.long_name;
+          }
+          if (types.includes('locality')) localityName = comp.long_name;
+          if (types.includes('postal_code')) postalCode = comp.long_name;
+          if (types.includes('point_of_interest') || types.includes('establishment')) poi = comp.long_name;
+        }
+
+        doorNo = streetNumber;
+        street = [routeName, sublocality].filter(Boolean).join(', ') || result.formatted_address.split(',')[0] || '';
+        if (localityName) city = localityName;
+        if (postalCode) pincode = postalCode;
+        if (poi) landmark = poi;
+      }
+    } catch (err) {
+      console.warn('Google Maps reverse geocoding notice:', err);
+    }
+  }
+
+  // 2. Nominatim OpenStreetMap Reverse Geocoding fallback
+  if (!street) {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const addr = data.address || {};
+        doorNo = addr.house_number || addr.building || addr.door_number || addr.flat || '';
+        street = addr.road || addr.suburb || addr.neighbourhood || addr.residential || addr.pedestrian || addr.city_district || '';
+        city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || 'Visakhapatnam';
+        if (addr.postcode) {
+          const match = addr.postcode.match(/\d{6}/);
+          pincode = match ? match[0] : addr.postcode;
+        }
+        landmark = addr.amenity || addr.shop || addr.building || addr.tourism || addr.historic || '';
+
+        if (!street && data.display_name) {
+          const parts = data.display_name.split(',').map((s: string) => s.trim());
+          street = parts.slice(0, 2).join(', ');
+        }
+      }
+    } catch (err) {
+      console.warn('Nominatim reverse geocode notice:', err);
+    }
+  }
+
+  return { doorNo, street, city, pincode, landmark };
+};
+
 export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = ({
   initialCity = 'Visakhapatnam',
   initialFullAddress = '',
@@ -146,7 +228,7 @@ export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = (
     });
   }, [city, doorNo, streetAddress, landmark, pincode, markerPos]);
 
-  // GPS Geolocation handler
+  // GPS Geolocation handler - Immediately reverse geocode and auto-fill address
   const handleUseCurrentGPS = () => {
     setIsLocating(true);
     if ('geolocation' in navigator) {
@@ -158,44 +240,19 @@ export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = (
           setMapCenter(coords);
           setMarkerPos(coords);
 
-          // Reverse geocode to auto-fill address details
-          try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}&zoom=18&addressdetails=1`
-            );
-            if (response.ok) {
-              const data = await response.json();
-              const addr = data.address || {};
-              const detectedDoor = addr.house_number || addr.building || 'Flat ' + Math.floor(101 + Math.random() * 400);
-              const detectedRoad = addr.road || addr.suburb || addr.neighbourhood || addr.residential || 'Gajuwaka Main Road';
-              const detectedCityName = addr.city || addr.town || addr.village || addr.county || 'Visakhapatnam';
-              const detectedPincodeCode = addr.postcode || '530026';
-              const detectedLandmarkVal = addr.amenity || addr.shop || addr.landmark || 'Near Main Center';
-
-              setDoorNo(detectedDoor);
-              setStreetAddress(detectedRoad);
-              setCity(detectedCityName);
-              setPincode(detectedPincodeCode);
-              setLandmark(detectedLandmarkVal);
-            }
-          } catch (err) {
-            console.warn('Reverse geocode notice:', err);
-          }
-
-          // Instantly direct the user address to the owner by Google Maps
-          const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(ownerAddressStr)}&destination=${newLat},${newLng}`;
-          try {
-            window.open(gmapsUrl, '_blank');
-          } catch (e) {
-            console.warn('Window open error:', e);
-          }
+          // Reverse geocode to auto-fill address details immediately
+          const geo = await performReverseGeocode(newLat, newLng);
+          if (geo.doorNo) setDoorNo(geo.doorNo);
+          if (geo.street) setStreetAddress(geo.street);
+          if (geo.city) setCity(geo.city);
+          if (geo.pincode) setPincode(geo.pincode);
+          if (geo.landmark) setLandmark(geo.landmark);
 
           setIsLocating(false);
         },
-        () => {
+        (err) => {
+          console.warn('GPS location detection error:', err);
           setIsLocating(false);
-          setMapCenter(DEFAULT_COORDS);
-          setMarkerPos(DEFAULT_COORDS);
         },
         { timeout: 10000, enableHighAccuracy: true }
       );
@@ -204,13 +261,22 @@ export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = (
     }
   };
 
-  const handleMapClick = (e: any) => {
+  const handleMapClick = async (e: any) => {
     if (e.detail?.latLng) {
       const newPos = {
         lat: e.detail.latLng.lat,
         lng: e.detail.latLng.lng
       };
       setMarkerPos(newPos);
+      setMapCenter(newPos);
+
+      // Reverse geocode when pin is clicked
+      const geo = await performReverseGeocode(newPos.lat, newPos.lng);
+      if (geo.doorNo) setDoorNo(geo.doorNo);
+      if (geo.street) setStreetAddress(geo.street);
+      if (geo.city) setCity(geo.city);
+      if (geo.pincode) setPincode(geo.pincode);
+      if (geo.landmark) setLandmark(geo.landmark);
     }
   };
 

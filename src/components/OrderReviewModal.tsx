@@ -154,8 +154,8 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({
               </div>
 
               <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                {cartItems.map((item) => (
-                  <div key={item.product.id} className="flex items-center justify-between gap-2 bg-zinc-900/60 p-2 rounded-xl">
+                {cartItems.map((item, idx) => (
+                  <div key={`rev-item-${item.product.id}-${idx}`} className="flex items-center justify-between gap-2 bg-zinc-900/60 p-2 rounded-xl">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={item.product.image}

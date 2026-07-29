@@ -684,8 +684,8 @@ export const AdminDashboard: React.FC = () => {
                         className="px-3 py-1.5 bg-zinc-950 rounded-xl border border-zinc-800 text-xs text-zinc-300 font-mono outline-none focus:border-blue-500"
                       >
                         <option value="all">All Categories ({products.length})</option>
-                        {categories.map((c) => (
-                          <option key={`opt-cat-${c.id}`} value={c.id}>{c.name}</option>
+                        {categories.map((c, cIdx) => (
+                          <option key={`opt-cat-${c.id}-${cIdx}`} value={c.id}>{c.name}</option>
                         ))}
                       </select>
                     </div>
@@ -705,8 +705,8 @@ export const AdminDashboard: React.FC = () => {
                           <div>
                             <label className="font-mono text-[10px] text-zinc-400">Category</label>
                             <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="w-full p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-white">
-                              {categories.map((c) => (
-                                <option key={`opt2-cat-${c.id}`} value={c.id}>{c.name}</option>
+                              {categories.map((c, cIdx) => (
+                                <option key={`opt2-cat-${c.id}-${cIdx}`} value={c.id}>{c.name}</option>
                               ))}
                             </select>
                           </div>
@@ -832,13 +832,13 @@ export const AdminDashboard: React.FC = () => {
                           No products found matching category filter or search term.
                         </div>
                       ) : (
-                        filteredAdminProducts.map((p) => {
+                        filteredAdminProducts.map((p, pIdx) => {
                           const isLowStock = p.stockCount < 5;
                           const isOutOfStock = p.stockCount === 0;
 
                           return (
                             <div
-                              key={`admin-prod-${p.id}`}
+                              key={`admin-prod-${p.id}-${pIdx}`}
                               className={`flex items-center justify-between p-2.5 rounded-xl border ${
                                 isOutOfStock
                                   ? 'border-red-500/30 bg-red-950/10'
@@ -1034,13 +1034,13 @@ export const AdminDashboard: React.FC = () => {
 
                     {/* Categories List */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {categories.map((cat) => {
+                      {categories.map((cat, catIdx) => {
                         const productCount = products.filter(p => p.category === cat.id).length;
                         const isGeneral = cat.id === 'general';
 
                         return (
                           <div
-                            key={`admin-cat-${cat.id}`}
+                            key={`admin-cat-${cat.id}-${catIdx}`}
                             className="p-3.5 rounded-2xl border border-zinc-800 bg-zinc-950 flex items-center justify-between gap-3 text-xs"
                           >
                             <div className="flex items-center gap-3 min-w-0">
@@ -1084,8 +1084,8 @@ export const AdminDashboard: React.FC = () => {
                 {activeTab === 'orders' && (
                   <div className="space-y-3">
                     <h3 className="text-sm font-mono font-bold text-zinc-400 uppercase">Customer Orders ({allOrders.length})</h3>
-                    {allOrders.map((ord) => (
-                      <div key={`admin-ord-${ord.id}`} className="p-3 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs space-y-2.5">
+                    {allOrders.map((ord, ordIdx) => (
+                      <div key={`admin-ord-${ord.id}-${ordIdx}`} className="p-3 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs space-y-2.5">
                         <div className="flex justify-between font-mono font-bold">
                           <span className="text-white">ORDER #{ord.id} • {ord.userName}</span>
                           <span className="text-emerald-400">₹{ord.grandTotal}</span>
@@ -1256,9 +1256,9 @@ export const AdminDashboard: React.FC = () => {
                       </h4>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {deliveryLocations.map((loc) => (
+                        {deliveryLocations.map((loc, lIdx) => (
                           <div
-                            key={`owner-loc-${loc.id}`}
+                            key={`owner-loc-${loc.id}-${lIdx}`}
                             className="p-3.5 rounded-2xl border border-zinc-800 bg-zinc-950 space-y-2 text-xs flex flex-col justify-between"
                           >
                             <div className="flex items-start justify-between">
@@ -1312,8 +1312,8 @@ export const AdminDashboard: React.FC = () => {
                         <p className="text-zinc-500 text-xs italic py-2">No active customer orders placed yet.</p>
                       ) : (
                         <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                          {allOrders.map((ord) => (
-                            <div key={`order-loc-${ord.id}`} className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs space-y-2">
+                          {allOrders.map((ord, oIdx) => (
+                            <div key={`order-loc-${ord.id}-${oIdx}`} className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs space-y-2">
                               <div className="flex items-center justify-between font-mono">
                                 <span className="font-extrabold text-white">{ord.id} - {ord.userName}</span>
                                 <span className="text-emerald-400 font-bold flex items-center gap-1">
@@ -1372,8 +1372,8 @@ export const AdminDashboard: React.FC = () => {
                     </form>
 
                     <div className="space-y-2">
-                      {allCoupons.map((c) => (
-                        <div key={`admin-c-${c.code}`} className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-950 text-xs flex justify-between font-mono font-bold">
+                      {allCoupons.map((c, cIdx) => (
+                        <div key={`admin-c-${c.code}-${cIdx}`} className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-950 text-xs flex justify-between font-mono font-bold">
                           <span className="text-white">{c.code} ({c.discountPercent}% OFF above ₹{c.minOrderValue})</span>
                           <span className="text-emerald-400">ACTIVE</span>
                         </div>
