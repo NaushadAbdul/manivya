@@ -195,31 +195,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem('manivya_user');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.name === 'Mobile Customer' || parsed.name === 'Guest Customer' || parsed.email === 'customer@manivya.com') {
-          parsed.name = 'Naushad Abdul';
-          parsed.email = 'naushadabdul2006@gmail.com';
-        }
-        return parsed;
+        return JSON.parse(saved);
       }
-      return {
-        id: 'usr-naushad',
-        name: 'Naushad Abdul',
-        email: 'naushadabdul2006@gmail.com',
-        phone: '7207554777',
-        role: 'customer',
-        addresses: [
-          {
-            id: 'addr-guest',
-            title: 'Location Address',
-            fullAddress: `${INITIAL_LOCATIONS[0].area}, Visakhapatnam - ${INITIAL_LOCATIONS[0].pincode}`,
-            area: INITIAL_LOCATIONS[0].area,
-            pincode: INITIAL_LOCATIONS[0].pincode,
-            isDefault: true
-          }
-        ],
-        createdAt: new Date().toISOString()
-      };
+      return null;
     } catch {
       return null;
     }
@@ -415,9 +393,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const data = userSnap.data();
             appUser = {
               id: fbUser.uid,
-              name: data.displayName || fbUser.displayName || 'Valued Customer',
+              name: data.displayName || fbUser.displayName || (fbUser.email ? formatNameFromEmail(fbUser.email) : 'Valued Customer'),
               email: fbUser.email || '',
-              phone: data.phone || '7207554777',
+              phone: data.phone || fbUser.phoneNumber || '',
               role: data.role || 'customer',
               addresses: data.addresses || [
                 {
@@ -434,9 +412,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } else {
             appUser = {
               id: fbUser.uid,
-              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Customer',
+              name: fbUser.displayName || (fbUser.email ? formatNameFromEmail(fbUser.email) : 'Customer'),
               email: fbUser.email || '',
-              phone: '7207554777',
+              phone: fbUser.phoneNumber || '',
               role: 'customer',
               addresses: [
                 {
@@ -531,22 +509,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      const userEmail = user.email || 'naushadabdul2006@gmail.com';
-      const userName = user.displayName || formatNameFromEmail(userEmail);
+      const userEmail = user.email || '';
+      const userName = user.displayName || (userEmail ? formatNameFromEmail(userEmail) : 'Google User');
 
       const loggedUser: User = {
         id: user.uid,
         name: userName,
         email: userEmail,
-        phone: user.phoneNumber || '7207554777',
+        phone: user.phoneNumber || '',
         role: 'customer',
         addresses: currentUser?.addresses || [
           {
             id: `addr-${Date.now()}`,
             title: 'Home',
-            fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-            area: 'Visakhapatnam',
-            pincode: '530026',
+            fullAddress: `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
+            area: selectedLocation.area,
+            pincode: selectedLocation.pincode,
             isDefault: true
           }
         ],
@@ -563,39 +541,45 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const currentDomain = diag.domain;
         console.warn(`[CONFIG_MISMATCH] Firebase domain (${currentDomain}) unauthorized. Executing mobile auth fallback.`);
         
-        let userEmail = 'naushadabdul2006@gmail.com';
+        let userEmail = '';
         if (typeof window !== 'undefined') {
           const promptedEmail = window.prompt(
-            `Firebase Domain Setup Notice (${currentDomain}):\nTo continue sign-in, enter your Google Email address:`,
-            'naushadabdul2006@gmail.com'
+            `Firebase Domain Notice (${currentDomain}):\nEnter your Google Email address to complete sign-in:`,
+            ''
           );
           if (promptedEmail && promptedEmail.trim()) {
             userEmail = promptedEmail.trim();
           }
         }
 
-        const derivedName = formatNameFromEmail(userEmail);
+        if (!userEmail) {
+          addToast('Google Sign-In cancelled (no email entered).', 'info');
+          return;
+        }
 
-        const mobileUser: User = {
-          id: `usr-google-${Date.now()}`,
+        const derivedName = formatNameFromEmail(userEmail);
+        const sanitizeId = userEmail.replace(/[^a-zA-Z0-9]/g, '_');
+
+        const googleUser: User = {
+          id: `usr-google-${sanitizeId}`,
           name: derivedName,
           email: userEmail,
-          phone: '7207554777',
+          phone: '',
           role: 'customer',
           addresses: [
             {
               id: `addr-${Date.now()}`,
               title: 'Home',
-              fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-              area: 'Visakhapatnam',
-              pincode: '530026',
+              fullAddress: `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
+              area: selectedLocation.area,
+              pincode: selectedLocation.pincode,
               isDefault: true
             }
           ],
           createdAt: new Date().toISOString()
         };
-        loginUser(mobileUser);
-        addToast(`Welcome back, ${mobileUser.name}! (${mobileUser.email}) 🎉`, 'success');
+        loginUser(googleUser);
+        addToast(`Welcome back, ${googleUser.name}! (${googleUser.email}) 🎉`, 'success');
         setIsAuthModalOpen(false);
         return;
       } else if (diag.category === 'NETWORK_FAILURE') {

@@ -69,14 +69,12 @@ export function formatNameFromEmail(email: string): string {
   const handle = email.split('@')[0].trim();
   if (!handle) return 'Google User';
 
-  if (handle.toLowerCase().includes('naushad')) return 'Naushad Abdul';
-  if (handle.toLowerCase().includes('kalyan')) return 'Kalyan Varma';
-
   const cleaned = handle.replace(/[0-9._-]+/g, ' ').trim();
   if (!cleaned) return handle.charAt(0).toUpperCase() + handle.slice(1);
 
   return cleaned
     .split(/\s+/)
+    .filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 }
