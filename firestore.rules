@@ -17,9 +17,9 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow create: if true;
-      allow read: if true;
-      allow update, delete: if isAuthenticated();
+      allow create: if true; // Allows order placement
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email);
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || request.auth.token.email != null);
     }
 
     match /products/{productId} {
@@ -28,3 +28,4 @@ service cloud.firestore {
     }
   }
 }
+

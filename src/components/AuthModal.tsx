@@ -50,22 +50,12 @@ export const AuthModal: React.FC = () => {
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('530026');
 
-  // Google Sign-In Fallback States
-  const [googleEmailInput, setGoogleEmailInput] = useState('');
-  const [showGoogleEmailBox, setShowGoogleEmailBox] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [domainNotice, setDomainNotice] = useState('');
 
-  const handleGoogleSignIn = async (emailOverride?: string) => {
+  const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      const res = await loginWithGoogle(emailOverride);
-      if (res?.requiresEmailInput) {
-        setShowGoogleEmailBox(true);
-        if (res.domain) {
-          setDomainNotice(`Firebase Domain notice for ${res.domain}: Popup auth is restricted on this host. Enter your Google Email to sign in:`);
-        }
-      }
+      await loginWithGoogle();
     } catch (e) {
       console.error('Google Sign In Error:', e);
     } finally {
@@ -484,7 +474,7 @@ export const AuthModal: React.FC = () => {
               {/* Google Sign-In Button */}
               <button
                 type="button"
-                onClick={() => handleGoogleSignIn()}
+                onClick={handleGoogleSignIn}
                 disabled={isGoogleLoading}
                 className="w-full py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 font-bold text-sm shadow-md flex items-center justify-center gap-3 transition-all border border-zinc-200 disabled:opacity-60"
               >
@@ -496,68 +486,6 @@ export const AuthModal: React.FC = () => {
                 </svg>
                 {isGoogleLoading ? 'Connecting Google...' : 'Continue with Google'}
               </button>
-
-              {showGoogleEmailBox ? (
-                <div className="p-3.5 bg-zinc-950 border border-blue-500/40 rounded-2xl space-y-2.5 text-left shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-blue-400 font-mono text-xs font-bold">
-                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>Google Email Sign In</span>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setShowGoogleEmailBox(false)}
-                      className="text-[10px] text-zinc-500 hover:text-zinc-300 font-mono"
-                    >
-                      Hide
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-zinc-300 leading-snug">
-                    {domainNotice || 'Enter your Google email address to sign in with your unique profile:'}
-                  </p>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 rounded-xl border border-zinc-800 focus-within:border-blue-500">
-                    <UserIcon className="w-4 h-4 text-zinc-500 shrink-0" />
-                    <input
-                      type="email"
-                      value={googleEmailInput}
-                      onChange={(e) => setGoogleEmailInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (googleEmailInput.trim()) {
-                            handleGoogleSignIn(googleEmailInput.trim());
-                          }
-                        }
-                      }}
-                      placeholder="e.g. yourname@gmail.com"
-                      className="flex-1 bg-transparent text-xs text-white font-mono outline-none"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!googleEmailInput.trim() || !googleEmailInput.includes('@')) {
-                        addToast('Please enter a valid Google email address.', 'error');
-                        return;
-                      }
-                      handleGoogleSignIn(googleEmailInput.trim());
-                    }}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    Sign In as Google User
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowGoogleEmailBox(true)}
-                    className="text-[11px] font-mono text-zinc-400 hover:text-blue-400 transition-colors underline"
-                  >
-                    Having trouble with Google popup? Enter Google email directly
-                  </button>
-                </div>
-              )}
 
               <div className="flex items-center my-2">
                 <div className="flex-grow border-t border-zinc-800"></div>
