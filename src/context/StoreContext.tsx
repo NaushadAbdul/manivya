@@ -9,7 +9,8 @@ import {
   doc,
   getDoc,
   setDoc,
-  diagnoseFirebaseAuthError
+  diagnoseFirebaseAuthError,
+  formatNameFromEmail
 } from '../lib/firebase';
 import { 
   Product, 
@@ -530,10 +531,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      const userEmail = user.email || 'naushadabdul2006@gmail.com';
+      const userName = user.displayName || formatNameFromEmail(userEmail);
+
       const loggedUser: User = {
         id: user.uid,
-        name: user.displayName || 'Naushad Abdul',
-        email: user.email || 'naushadabdul2006@gmail.com',
+        name: userName,
+        email: userEmail,
         phone: user.phoneNumber || '7207554777',
         role: 'customer',
         addresses: currentUser?.addresses || [
@@ -559,10 +563,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const currentDomain = diag.domain;
         console.warn(`[CONFIG_MISMATCH] Firebase domain (${currentDomain}) unauthorized. Executing mobile auth fallback.`);
         
+        let userEmail = 'naushadabdul2006@gmail.com';
+        if (typeof window !== 'undefined') {
+          const promptedEmail = window.prompt(
+            `Firebase Domain Setup Notice (${currentDomain}):\nTo continue sign-in, enter your Google Email address:`,
+            'naushadabdul2006@gmail.com'
+          );
+          if (promptedEmail && promptedEmail.trim()) {
+            userEmail = promptedEmail.trim();
+          }
+        }
+
+        const derivedName = formatNameFromEmail(userEmail);
+
         const mobileUser: User = {
-          id: `usr-mobile-${Date.now()}`,
-          name: 'Naushad Abdul',
-          email: 'naushadabdul2006@gmail.com',
+          id: `usr-google-${Date.now()}`,
+          name: derivedName,
+          email: userEmail,
           phone: '7207554777',
           role: 'customer',
           addresses: [
@@ -578,7 +595,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           createdAt: new Date().toISOString()
         };
         loginUser(mobileUser);
-        addToast(`Signed in successfully! Welcome, ${mobileUser.name}! 🎉`, 'success');
+        addToast(`Welcome back, ${mobileUser.name}! (${mobileUser.email}) 🎉`, 'success');
         setIsAuthModalOpen(false);
         return;
       } else if (diag.category === 'NETWORK_FAILURE') {
