@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { 
   X, 
   QrCode, 
@@ -13,7 +14,8 @@ import {
   ExternalLink,
   ArrowRight,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -42,24 +44,39 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [utrNumber, setUtrNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'qr' | 'upi_apps' | 'card'>('qr');
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes timer
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   const storeUpiId = "7207554777@sbi";
   const storePhone = "7207554777";
   const storeName = "MANIVYA ENTERPRISES";
 
-  // Countdown timer effect
+  // UPI deep link for mobile apps
+  const upiString = `upi://pay?pa=${storeUpiId}&pn=${encodeURIComponent(storeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(orderId ? `Order #${orderId}` : 'Payment')}`;
+
+  // Generate QR code locally via QRCode library
   useEffect(() => {
     if (!isOpen) return;
     setTimeLeft(300);
     setErrorMessage(null);
+
+    QRCode.toDataURL(upiString, {
+      width: 280,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' }
+    })
+      .then(url => setQrDataUrl(url))
+      .catch(err => {
+        console.warn('QR Code generation error, using fallback:', err);
+        setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiString)}&color=000000&bgcolor=ffffff`);
+      });
+
     const timer = setInterval(() => {
       setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, [isOpen]);
+  }, [isOpen, amount, orderId]);
 
   if (!isOpen) return null;
 
@@ -101,10 +118,6 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  // Generate QR Code for UPI string with pa=7207554777@sbi
-  const upiString = `upi://pay?pa=${storeUpiId}&pn=${encodeURIComponent(storeName)}&am=${amount}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiString)}&color=000000&bgcolor=ffffff`;
 
   return (
     <AnimatePresence>
@@ -171,14 +184,32 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
             {/* Scan QR Code Section */}
             <div className="space-y-3 text-center">
               <div className="p-4 bg-white rounded-2xl inline-block shadow-xl border-4 border-blue-500/30">
-                <img
-                  src={qrCodeUrl}
-                  alt="Scan UPI QR Code to Pay"
-                  className="w-48 h-48 object-contain mx-auto"
-                />
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt="Scan UPI QR Code to Pay"
+                    className="w-48 h-48 object-contain mx-auto"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center bg-zinc-100 rounded-xl text-zinc-500 text-xs font-mono">
+                    Generating QR...
+                  </div>
+                )}
                 <p className="text-[11px] font-mono font-bold text-zinc-900 mt-2">
                   Scan with PhonePe, GPay, Paytm, BHIM or YONO
                 </p>
+              </div>
+
+              {/* Mobile Direct Pay Button */}
+              <div className="sm:hidden pt-1">
+                <a
+                  href={upiString}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg transition-all"
+                >
+                  <Zap className="w-4 h-4 fill-black" />
+                  <span>PAY ₹{amount} DIRECTLY VIA ANY UPI APP</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
 
               {/* UPI ID / VPA Section */}

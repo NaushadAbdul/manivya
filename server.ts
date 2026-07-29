@@ -468,7 +468,8 @@ app.post('/api/orders', (req, res) => {
     return res.status(400).json({ error: 'Customer name is required for order placement.' });
   }
 
-  const cleanPhone = (userPhone || '').replace(/\D/g, '');
+  const rawDigits = (userPhone || '').replace(/\D/g, '');
+  const cleanPhone = rawDigits.length > 10 ? rawDigits.slice(-10) : rawDigits;
   if (!cleanPhone || cleanPhone.length < 10) {
     return res.status(400).json({ error: 'A valid 10-digit mobile phone number is required for delivery rider contact.' });
   }

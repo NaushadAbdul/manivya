@@ -118,7 +118,8 @@ export const CartDrawer: React.FC = () => {
     }
 
     // 2. Validate Contact Mobile
-    const cleanPhone = contactPhone.replace(/\D/g, '');
+    const rawContactDigits = contactPhone.replace(/\D/g, '');
+    const cleanPhone = rawContactDigits.length > 10 ? rawContactDigits.slice(-10) : rawContactDigits;
     if (!cleanPhone || cleanPhone.length < 10) {
       addToast('Please enter a valid 10-digit mobile number for delivery rider contact.', 'error');
       return;
@@ -145,7 +146,8 @@ export const CartDrawer: React.FC = () => {
     setIsPlacingOrder(true);
     setPaymentMethod(chosenPaymentMethod);
 
-    const finalPhone = contactPhone.replace(/\D/g, '') || currentUser?.phone || '7207554777';
+    const phoneInput = contactPhone.replace(/\D/g, '') || currentUser?.phone || '7207554777';
+    const finalPhone = phoneInput.length > 10 ? phoneInput.slice(-10) : phoneInput;
     const idempotencyKey = `chk-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
     try {
