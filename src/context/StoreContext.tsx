@@ -105,9 +105,31 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('manivya_user');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  const activeUserId = currentUser?.id || 'guest';
+  const cartStorageKey = `manivya_cart_${activeUserId}`;
+  const wishlistStorageKey = `manivya_wishlist_${activeUserId}`;
+
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('manivya_cart');
+      const initUserId = (() => {
+        try {
+          const u = localStorage.getItem('manivya_user');
+          return u ? (JSON.parse(u)?.id || 'guest') : 'guest';
+        } catch { return 'guest'; }
+      })();
+      const saved = localStorage.getItem(`manivya_cart_${initUserId}`) || localStorage.getItem('manivya_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -116,12 +138,45 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [wishlist, setWishlist] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('manivya_wishlist');
+      const initUserId = (() => {
+        try {
+          const u = localStorage.getItem('manivya_user');
+          return u ? (JSON.parse(u)?.id || 'guest') : 'guest';
+        } catch { return 'guest'; }
+      })();
+      const saved = localStorage.getItem(`manivya_wishlist_${initUserId}`) || localStorage.getItem('manivya_wishlist');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
+
+  // Hydrate cart and wishlist whenever user session switches
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem(cartStorageKey) || (activeUserId === 'guest' ? localStorage.getItem('manivya_cart') : null);
+      setCart(savedCart ? JSON.parse(savedCart) : []);
+    } catch {
+      setCart([]);
+    }
+
+    try {
+      const savedWishlist = localStorage.getItem(wishlistStorageKey) || (activeUserId === 'guest' ? localStorage.getItem('manivya_wishlist') : null);
+      setWishlist(savedWishlist ? JSON.parse(savedWishlist) : []);
+    } catch {
+      setWishlist([]);
+    }
+  }, [activeUserId]);
+
+  // Sync Cart to per-user LocalStorage
+  useEffect(() => {
+    localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+  }, [cart, cartStorageKey]);
+
+  // Sync Wishlist to per-user LocalStorage
+  useEffect(() => {
+    localStorage.setItem(wishlistStorageKey, JSON.stringify(wishlist));
+  }, [wishlist, wishlistStorageKey]);
 
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -191,18 +246,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addToast('Delivery location removed!', 'info');
   };
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem('manivya_user');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  });
-
   const [adminToken, setAdminToken] = useState<string | null>(() => {
     return localStorage.getItem('manivya_admin_token');
   });
@@ -218,16 +261,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
-
-  // Sync Cart to LocalStorage
-  useEffect(() => {
-    localStorage.setItem('manivya_cart', JSON.stringify(cart));
-  }, [cart]);
-
-  // Sync Wishlist to LocalStorage
-  useEffect(() => {
-    localStorage.setItem('manivya_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
 
   // Load initial data
   useEffect(() => {
