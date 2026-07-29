@@ -87,6 +87,7 @@ interface StoreContextType {
   loginWithGoogle: () => Promise<void>;
   logoutUser: () => void;
   updateUserAddress: (newAddress: { fullAddress: string; area: string; pincode: string; title?: string }) => void;
+  updateUserProfile: (updatedFields: { name?: string; email?: string; phone?: string }) => void;
   adminLogin: (token: string) => void;
   adminLogout: () => void;
 
@@ -192,10 +193,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem('manivya_user');
-      return saved ? JSON.parse(saved) : {
-        id: 'usr-guest',
-        name: 'Guest Customer',
-        email: 'customer@manivya.com',
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.name === 'Mobile Customer' || parsed.name === 'Guest Customer' || parsed.email === 'customer@manivya.com') {
+          parsed.name = 'Naushad Abdul';
+          parsed.email = 'naushadabdul2006@gmail.com';
+        }
+        return parsed;
+      }
+      return {
+        id: 'usr-naushad',
+        name: 'Naushad Abdul',
+        email: 'naushadabdul2006@gmail.com',
         phone: '7207554777',
         role: 'customer',
         addresses: [
@@ -493,6 +502,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addToast(`Delivery address updated according to location: ${newAddr.area || newAddr.pincode}`, 'success');
   };
 
+  const updateUserProfile = (updatedFields: { name?: string; email?: string; phone?: string }) => {
+    setCurrentUser(prev => {
+      if (!prev) return prev;
+      const updatedUser = { ...prev, ...updatedFields };
+      try {
+        localStorage.setItem('manivya_user', JSON.stringify(updatedUser));
+      } catch (e) {
+        console.error(e);
+      }
+      if (auth.currentUser) {
+        setDoc(doc(db, 'users', auth.currentUser.uid), updatedFields, { merge: true }).catch(() => {});
+      }
+      return updatedUser;
+    });
+    addToast('Profile updated successfully! 🎉', 'success');
+  };
+
   const isSigningInRef = useRef(false);
 
   const loginWithGoogle = async () => {
@@ -504,7 +530,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      addToast(`Google Sign-In successful! Welcome, ${user.displayName || user.email}! 🎉`, 'success');
+      const loggedUser: User = {
+        id: user.uid,
+        name: user.displayName || 'Naushad Abdul',
+        email: user.email || 'naushadabdul2006@gmail.com',
+        phone: user.phoneNumber || '7207554777',
+        role: 'customer',
+        addresses: currentUser?.addresses || [
+          {
+            id: `addr-${Date.now()}`,
+            title: 'Home',
+            fullAddress: '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
+            area: 'Visakhapatnam',
+            pincode: '530026',
+            isDefault: true
+          }
+        ],
+        createdAt: new Date().toISOString()
+      };
+      loginUser(loggedUser);
+      addToast(`Google Sign-In successful! Welcome, ${loggedUser.name}! 🎉`, 'success');
       setIsAuthModalOpen(false);
     } catch (err: any) {
       // Diagnostic logging distinguishes between configuration mismatches, network issues, popup/environment blocks & user cancellations
@@ -516,8 +561,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         
         const mobileUser: User = {
           id: `usr-mobile-${Date.now()}`,
-          name: 'Mobile Customer',
-          email: 'customer@manivya.com',
+          name: 'Naushad Abdul',
+          email: 'naushadabdul2006@gmail.com',
           phone: '7207554777',
           role: 'customer',
           addresses: [
@@ -533,7 +578,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           createdAt: new Date().toISOString()
         };
         loginUser(mobileUser);
-        addToast(`Signed in successfully! Welcome! 🎉`, 'success');
+        addToast(`Signed in successfully! Welcome, ${mobileUser.name}! 🎉`, 'success');
         setIsAuthModalOpen(false);
         return;
       } else if (diag.category === 'NETWORK_FAILURE') {
@@ -626,6 +671,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loginWithGoogle,
         logoutUser,
         updateUserAddress,
+        updateUserProfile,
         adminLogin,
         adminLogout,
 

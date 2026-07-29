@@ -144,8 +144,13 @@ export function diagnoseFirebaseAuthError(err: any): FirebaseAuthDiagnostic {
   };
 
   console.group(`🔥 Firebase Auth Diagnostic [${category}] (${isMobile ? 'Mobile' : 'Desktop'})`);
-  console.error(`Code: ${code}`);
-  console.error(`Message: ${message}`);
+  if (category === 'USER_CANCELLED') {
+    console.info(`Code: ${code}`);
+    console.info(`Message: ${message}`);
+  } else {
+    console.warn(`Code: ${code}`);
+    console.warn(`Message: ${message}`);
+  }
   console.info(`Domain: ${domain}`);
   console.info(`Recommendation: ${recommendation}`);
   console.groupEnd();

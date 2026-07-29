@@ -20,12 +20,19 @@ export const AuthModal: React.FC = () => {
     loginWithGoogle, 
     logoutUser, 
     updateUserAddress,
+    updateUserProfile,
     selectedLocation,
     setIsLocationModalOpen,
     addToast 
   } = useStore();
   const [isSignup, setIsSignup] = useState(false);
   
+  // Profile editing
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+
   // Address editing in profile
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [customStreet, setCustomStreet] = useState('');
@@ -234,21 +241,93 @@ export const AuthModal: React.FC = () => {
           {currentUser && currentUser.id !== 'usr-guest' ? (
             /* Logged in Account Overview */
             <div className="space-y-5">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-extrabold text-2xl flex items-center justify-center shadow-lg border border-blue-400/30">
-                  {currentUser.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-extrabold text-white">{currentUser.name}</h3>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Active
-                    </span>
+              <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-extrabold text-2xl flex items-center justify-center shadow-lg border border-blue-400/30 shrink-0">
+                      {currentUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-extrabold text-white">{currentUser.name}</h3>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-400 font-mono font-bold mt-0.5 break-all">
+                        {currentUser.email}
+                      </p>
+                      <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                        +{currentUser.phone}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-blue-400 font-mono font-bold mt-0.5">
-                    +{currentUser.phone} • {currentUser.email}
-                  </p>
+                  <button
+                    onClick={() => {
+                      setEditName(currentUser.name);
+                      setEditEmail(currentUser.email);
+                      setEditPhone(currentUser.phone);
+                      setIsEditingProfile(!isEditingProfile);
+                    }}
+                    className="text-[11px] font-mono text-emerald-400 hover:underline font-bold shrink-0 self-start mt-0.5"
+                  >
+                    {isEditingProfile ? 'Cancel' : 'Edit Profile'}
+                  </button>
                 </div>
+
+                {isEditingProfile && (
+                  <div className="pt-3 border-t border-zinc-800 space-y-2.5">
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-400 uppercase">Full Name</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="e.g. Naushad Abdul"
+                        className="w-full mt-1 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs text-white font-medium outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-400 uppercase">Email Address</label>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          placeholder="naushadabdul2006@gmail.com"
+                          className="w-full mt-1 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs text-white font-medium outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-mono text-zinc-400 uppercase">Phone Number</label>
+                        <input
+                          type="text"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          placeholder="7207554777"
+                          className="w-full mt-1 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs text-white font-mono font-bold outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!editName.trim() || !editEmail.trim()) {
+                          addToast('Name and email are required', 'error');
+                          return;
+                        }
+                        updateUserProfile({
+                          name: editName.trim(),
+                          email: editEmail.trim(),
+                          phone: editPhone.trim() || '7207554777'
+                        });
+                        setIsEditingProfile(false);
+                      }}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all shadow-md mt-1"
+                    >
+                      Save Profile Changes
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Delivery Address Card */}
