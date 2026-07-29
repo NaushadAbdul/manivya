@@ -598,27 +598,49 @@ export const AdminDashboard: React.FC = () => {
 
                 
                 {/* TAB 1: Analytics */}
-                {activeTab === 'analytics' && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-mono font-bold text-zinc-400 uppercase">Live Store Overview</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
-                        <p className="text-[10px] font-mono font-bold text-emerald-400 uppercase">Total Revenue</p>
-                        <p className="text-2xl font-black font-mono text-white">₹{stats?.totalRevenue || 249}</p>
-                      </div>
+                {activeTab === 'analytics' && (() => {
+                  const activeOrders = allOrders.filter(o => o.orderStatus !== 'cancelled');
+                  const cancelledOrders = allOrders.filter(o => o.orderStatus === 'cancelled');
+                  const calculatedRevenue = allOrders.length > 0 
+                    ? activeOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0)
+                    : (stats?.totalRevenue ?? 0);
+                  const activeOrdersCount = allOrders.length > 0 ? activeOrders.length : (stats?.todayOrdersCount ?? 0);
+                  const cancelledProductsCount = cancelledOrders.reduce(
+                    (sum, o) => sum + (o.items || []).reduce((iSum, item) => iSum + (item.quantity || 1), 0),
+                    0
+                  );
+                  const cancelledOrdersCount = cancelledOrders.length;
 
-                      <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
-                        <p className="text-[10px] font-mono font-bold text-blue-400 uppercase">Total Orders</p>
-                        <p className="text-2xl font-black font-mono text-white">{stats?.todayOrdersCount || 1}</p>
-                      </div>
+                  return (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-mono font-bold text-zinc-400 uppercase">Live Store Overview</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                          <p className="text-[10px] font-mono font-bold text-emerald-400 uppercase">Total Revenue</p>
+                          <p className="text-2xl font-black font-mono text-white">₹{calculatedRevenue}</p>
+                          <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Excludes cancelled orders</p>
+                        </div>
 
-                      <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
-                        <p className="text-[10px] font-mono font-bold text-amber-400 uppercase">Low Stock Alert</p>
-                        <p className="text-2xl font-black font-mono text-white">{stats?.lowStockProductsCount || 0}</p>
+                        <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                          <p className="text-[10px] font-mono font-bold text-blue-400 uppercase">Total Orders</p>
+                          <p className="text-2xl font-black font-mono text-white">{activeOrdersCount}</p>
+                          <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{allOrders.length} total placed</p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                          <p className="text-[10px] font-mono font-bold text-rose-400 uppercase">Total Cancelled Products</p>
+                          <p className="text-2xl font-black font-mono text-rose-400">{cancelledProductsCount}</p>
+                          <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{cancelledOrdersCount} cancelled order(s)</p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                          <p className="text-[10px] font-mono font-bold text-amber-400 uppercase">Low Stock Alert</p>
+                          <p className="text-2xl font-black font-mono text-white">{stats?.lowStockProductsCount || products.filter(p => p.stockCount <= 10).length}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* TAB 2: Products CRUD */}
                 {activeTab === 'products' && (
@@ -662,8 +684,8 @@ export const AdminDashboard: React.FC = () => {
                         className="px-3 py-1.5 bg-zinc-950 rounded-xl border border-zinc-800 text-xs text-zinc-300 font-mono outline-none focus:border-blue-500"
                       >
                         <option value="all">All Categories ({products.length})</option>
-                        {categories.map((c, cIdx) => (
-                          <option key={`opt-cat-${c.id}-${cIdx}`} value={c.id}>{c.name}</option>
+                        {categories.map((c) => (
+                          <option key={`opt-cat-${c.id}`} value={c.id}>{c.name}</option>
                         ))}
                       </select>
                     </div>
@@ -683,8 +705,8 @@ export const AdminDashboard: React.FC = () => {
                           <div>
                             <label className="font-mono text-[10px] text-zinc-400">Category</label>
                             <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="w-full p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-white">
-                              {categories.map((c, cIdx) => (
-                                <option key={`opt2-cat-${c.id}-${cIdx}`} value={c.id}>{c.name}</option>
+                              {categories.map((c) => (
+                                <option key={`opt2-cat-${c.id}`} value={c.id}>{c.name}</option>
                               ))}
                             </select>
                           </div>
@@ -810,13 +832,13 @@ export const AdminDashboard: React.FC = () => {
                           No products found matching category filter or search term.
                         </div>
                       ) : (
-                        filteredAdminProducts.map((p, pIdx) => {
+                        filteredAdminProducts.map((p) => {
                           const isLowStock = p.stockCount < 5;
                           const isOutOfStock = p.stockCount === 0;
 
                           return (
                             <div
-                              key={`admin-prod-${p.id}-${pIdx}`}
+                              key={`admin-prod-${p.id}`}
                               className={`flex items-center justify-between p-2.5 rounded-xl border ${
                                 isOutOfStock
                                   ? 'border-red-500/30 bg-red-950/10'
@@ -1012,13 +1034,13 @@ export const AdminDashboard: React.FC = () => {
 
                     {/* Categories List */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {categories.map((cat, catIdx) => {
+                      {categories.map((cat) => {
                         const productCount = products.filter(p => p.category === cat.id).length;
                         const isGeneral = cat.id === 'general';
 
                         return (
                           <div
-                            key={`admin-cat-${cat.id}-${catIdx}`}
+                            key={`admin-cat-${cat.id}`}
                             className="p-3.5 rounded-2xl border border-zinc-800 bg-zinc-950 flex items-center justify-between gap-3 text-xs"
                           >
                             <div className="flex items-center gap-3 min-w-0">
@@ -1062,8 +1084,8 @@ export const AdminDashboard: React.FC = () => {
                 {activeTab === 'orders' && (
                   <div className="space-y-3">
                     <h3 className="text-sm font-mono font-bold text-zinc-400 uppercase">Customer Orders ({allOrders.length})</h3>
-                    {allOrders.map((ord, ordIdx) => (
-                      <div key={`admin-ord-${ord.id}-${ordIdx}`} className="p-3 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs space-y-2.5">
+                    {allOrders.map((ord) => (
+                      <div key={`admin-ord-${ord.id}`} className="p-3 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs space-y-2.5">
                         <div className="flex justify-between font-mono font-bold">
                           <span className="text-white">ORDER #{ord.id} • {ord.userName}</span>
                           <span className="text-emerald-400">₹{ord.grandTotal}</span>
@@ -1234,9 +1256,9 @@ export const AdminDashboard: React.FC = () => {
                       </h4>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {deliveryLocations.map((loc, idx) => (
+                        {deliveryLocations.map((loc) => (
                           <div
-                            key={`owner-loc-${loc.id}-${idx}`}
+                            key={`owner-loc-${loc.id}`}
                             className="p-3.5 rounded-2xl border border-zinc-800 bg-zinc-950 space-y-2 text-xs flex flex-col justify-between"
                           >
                             <div className="flex items-start justify-between">
@@ -1290,8 +1312,8 @@ export const AdminDashboard: React.FC = () => {
                         <p className="text-zinc-500 text-xs italic py-2">No active customer orders placed yet.</p>
                       ) : (
                         <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                          {allOrders.map((ord, oIdx) => (
-                            <div key={`order-loc-${ord.id}-${oIdx}`} className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs space-y-2">
+                          {allOrders.map((ord) => (
+                            <div key={`order-loc-${ord.id}`} className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs space-y-2">
                               <div className="flex items-center justify-between font-mono">
                                 <span className="font-extrabold text-white">{ord.id} - {ord.userName}</span>
                                 <span className="text-emerald-400 font-bold flex items-center gap-1">
@@ -1350,8 +1372,8 @@ export const AdminDashboard: React.FC = () => {
                     </form>
 
                     <div className="space-y-2">
-                      {allCoupons.map((c, cIdx) => (
-                        <div key={`admin-c-${c.code}-${cIdx}`} className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-950 text-xs flex justify-between font-mono font-bold">
+                      {allCoupons.map((c) => (
+                        <div key={`admin-c-${c.code}`} className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-950 text-xs flex justify-between font-mono font-bold">
                           <span className="text-white">{c.code} ({c.discountPercent}% OFF above ₹{c.minOrderValue})</span>
                           <span className="text-emerald-400">ACTIVE</span>
                         </div>

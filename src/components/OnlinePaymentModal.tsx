@@ -200,45 +200,46 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
               </div>
             </div>
 
-            {/* Optional UTR / Reference Number Input */}
-            <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1.5">
-              <label className="block text-[10px] font-mono font-bold text-zinc-400 uppercase">
-                12-DIGIT UTR / TRANSACTION REF NO. (OPTIONAL)
-              </label>
-              <input
-                type="text"
-                value={utrNumber}
-                onChange={(e) => setUtrNumber(e.target.value)}
-                placeholder="e.g. 329184920192"
-                className="w-full px-3 py-2 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-mono font-bold text-white outline-none focus:border-emerald-500"
-                maxLength={12}
-              />
-            </div>
-
-            {/* Payment Confirmation Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleConfirmPayment}
-                disabled={isVerifying}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl transition-all active:scale-98 disabled:opacity-50"
-              >
-                {isVerifying ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                    <span>Verifying Online Payment...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>I HAVE PAID ₹{amount} • CONFIRM ORDER</span>
-                  </>
-                )}
-              </button>
+            {/* 12-Digit UTR / Transaction Ref No. Input */}
+            <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] font-mono font-bold text-zinc-400 uppercase">
+                  12-DIGIT UTR / TRANSACTION REF NO.
+                </label>
+                <span className="text-[10px] font-mono text-emerald-400">Auto-Verifies Admin Received</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={utrNumber}
+                  onChange={(e) => setUtrNumber(e.target.value)}
+                  placeholder="Enter 12-Digit UTR or leave empty"
+                  className="flex-1 px-3 py-2.5 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-mono font-bold text-white outline-none focus:border-emerald-500"
+                  maxLength={12}
+                />
+                <button
+                  type="button"
+                  onClick={handleConfirmPayment}
+                  disabled={isVerifying}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 transition-all shrink-0 disabled:opacity-50 shadow-md"
+                >
+                  {isVerifying ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Submit Payment</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             <p className="text-center text-[11px] text-zinc-400 font-mono">
-              After scanning and making payment to <strong className="text-white">{storeUpiId}</strong>, click button above to place order.
+              After scanning QR and completing payment to <strong className="text-white">{storeUpiId}</strong>, click <strong className="text-emerald-400">Submit Payment</strong> to confirm.
             </p>
 
           </div>

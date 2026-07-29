@@ -25,6 +25,7 @@ import {
   initMongoDBAtlas,
   getMongoStatus,
   saveOrderToMongo,
+  deleteOrderFromMongo,
   saveProductToMongo,
   saveBusinessToMongo,
   loadAllFromMongo,
@@ -627,20 +628,32 @@ app.post('/api/orders/:id/confirm', (req, res) => {
   res.json(order);
 });
 
-// Cancel Order Endpoint (Incomplete/Interrupted Checkout)
+// Cancel / Delete Order Endpoint
 app.post('/api/orders/:id/cancel', (req, res) => {
   const { reason } = req.body;
-  const order = orders.find(o => o.id === req.params.id);
+  const orderIdx = orders.findIndex(o => o.id === req.params.id);
 
-  if (!order) {
+  if (orderIdx === -1) {
     return res.status(404).json({ error: 'Order not found' });
   }
 
-  order.orderStatus = 'cancelled';
-  order.paymentStatus = 'failed';
-  saveOrderToMongo(order);
+  const [removedOrder] = orders.splice(orderIdx, 1);
+  deleteOrderFromMongo(req.params.id);
 
-  res.json({ success: true, message: reason || 'Order checkout was cancelled or failed.', order });
+  res.json({ success: true, message: reason || 'Order was cancelled and deleted.', order: removedOrder });
+});
+
+app.delete('/api/orders/:id', (req, res) => {
+  const orderIdx = orders.findIndex(o => o.id === req.params.id);
+
+  if (orderIdx === -1) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  const [removedOrder] = orders.splice(orderIdx, 1);
+  deleteOrderFromMongo(req.params.id);
+
+  res.json({ success: true, message: 'Order deleted successfully.', order: removedOrder });
 });
 
 // Update Order Status
@@ -653,11 +666,18 @@ app.put('/api/orders/:id/status', (req, res, next) => {
   requireAdmin(req, res, next);
 }, (req, res) => {
   const { status } = req.body as { status: OrderStatus };
-  const order = orders.find(o => o.id === req.params.id);
-  if (!order) {
+  const orderIdx = orders.findIndex(o => o.id === req.params.id);
+  if (orderIdx === -1) {
     return res.status(404).json({ error: 'Order not found' });
   }
 
+  if (status === 'cancelled') {
+    const [removedOrder] = orders.splice(orderIdx, 1);
+    deleteOrderFromMongo(req.params.id);
+    return res.json({ ...removedOrder, orderStatus: 'cancelled' });
+  }
+
+  const order = orders[orderIdx];
   order.orderStatus = status;
   saveOrderToMongo(order);
   res.json(order);
@@ -763,12 +783,19 @@ app.get('/api/orders/:id/invoice', (req, res) => {
 
 // Admin Stats
 app.get('/api/admin/stats', requireAdmin, (req, res) => {
-  const totalRevenue = orders.reduce((sum, o) => sum + o.grandTotal, 0);
+  const activeOrders = orders.filter(o => o.orderStatus !== 'cancelled');
+  const cancelledOrders = orders.filter(o => o.orderStatus === 'cancelled');
+  const totalRevenue = activeOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+  const cancelledOrdersCount = cancelledOrders.length;
+  const cancelledProductsCount = cancelledOrders.reduce((sum, o) => sum + (o.items || []).reduce((iSum, item) => iSum + (item.quantity || 1), 0), 0);
   const lowStockCount = products.filter(p => p.stockCount <= 10).length;
 
   res.json({
     totalRevenue,
-    todayOrdersCount: orders.length,
+    todayOrdersCount: activeOrders.length,
+    totalOrdersCount: orders.length,
+    cancelledOrdersCount,
+    cancelledProductsCount,
     totalProductsCount: products.length,
     lowStockProductsCount: lowStockCount,
     averageDeliveryTime: 11.4,

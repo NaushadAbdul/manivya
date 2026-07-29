@@ -177,10 +177,32 @@ export const CartDrawer: React.FC = () => {
         couponCodeApplied: appliedCoupon || undefined
       });
 
-      setPendingOrder(createdPendingOrder);
-      // Switch to Payment Modal for Admin QR scanning/confirmation
-      setIsReviewModalOpen(false);
-      setIsOnlinePaymentModalOpen(true);
+      if (chosenPaymentMethod === 'COD') {
+        const confirmed = await api.confirmOrder(createdPendingOrder.id, {
+          paymentMethod: 'COD',
+          paymentStatus: 'pending'
+        });
+
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+
+        clearCart();
+        setIsReviewModalOpen(false);
+        setIsCartOpen(false);
+        setPendingOrder(null);
+        setConfirmedOrder(confirmed);
+        setIsNotificationOpen(true);
+        addToast(`🛍️ Order #${confirmed.id} placed successfully! Total ₹${confirmed.grandTotal} (Cash on Delivery) ⚡`, 'success');
+        await refreshOrders();
+      } else {
+        setPendingOrder(createdPendingOrder);
+        // Switch to Payment Modal for Admin QR scanning/confirmation
+        setIsReviewModalOpen(false);
+        setIsOnlinePaymentModalOpen(true);
+      }
     } catch (err: any) {
       addToast(err.message || 'Failed to initialize order checkout', 'error');
     } finally {
@@ -411,9 +433,9 @@ export const CartDrawer: React.FC = () => {
                   <span className="font-mono font-bold text-emerald-400">₹{driverTip}</span>
                 </div>
                 <div className="flex gap-2">
-                  {[0, 10, 20, 30, 50].map(tip => (
+                  {[0, 10, 20, 30, 50].map((tip) => (
                     <button
-                      key={tip}
+                      key={`tip-${tip}`}
                       onClick={() => setDriverTip(tip)}
                       className={`flex-1 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all ${
                         driverTip === tip

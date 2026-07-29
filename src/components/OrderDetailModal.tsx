@@ -1,7 +1,6 @@
 import React from 'react';
 import { Order, OrderStatus } from '../types';
 import { ManivyaLogo } from './ManivyaLogo';
-import { DeliveryMapTracker } from './DeliveryMapTracker';
 import { 
   X, 
   PackageCheck, 
@@ -372,7 +371,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           <div className="p-4 sm:p-5 border-t border-zinc-800 bg-zinc-950 flex flex-wrap items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2">
               {/* Cancel Button */}
-              {!isCancelled && (order.orderStatus === 'placed' || order.orderStatus === 'packing') && onCancelOrder && (
+              {!isCancelled && order.orderStatus !== 'delivered' && onCancelOrder && (
                 <button
                   onClick={() => {
                     onCancelOrder(order);

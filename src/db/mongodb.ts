@@ -183,6 +183,15 @@ export async function saveOrderToMongo(order: Order) {
   }
 }
 
+export async function deleteOrderFromMongo(orderId: string) {
+  if (!isConnected) return;
+  try {
+    await (MongoOrderModel as any).deleteOne({ id: orderId });
+  } catch (err) {
+    console.warn('⚠️ MongoDB delete order warning:', err);
+  }
+}
+
 export async function saveProductToMongo(product: Product) {
   if (!isConnected) return;
   try {

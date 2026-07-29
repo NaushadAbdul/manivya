@@ -143,6 +143,8 @@ export interface AdminStats {
   lowStockProductsCount: number;
   averageDeliveryTime: number;
   activeCustomersCount: number;
+  cancelledOrdersCount?: number;
+  cancelledProductsCount?: number;
 }
 
 export interface AIRecommendationRequest {

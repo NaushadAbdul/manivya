@@ -149,8 +149,8 @@ export const ProductDetailModal: React.FC = () => {
                       Specifications
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      {Object.entries(product.specs).map(([key, val], sIdx) => (
-                        <div key={`spec-${key}-${sIdx}`} className="flex flex-col">
+                      {Object.entries(product.specs).map(([key, val]) => (
+                        <div key={`spec-${key}`} className="flex flex-col">
                           <span className="text-zinc-500 font-medium text-[10px]">{key}</span>
                           <span className="font-semibold text-zinc-200">{val}</span>
                         </div>
@@ -205,8 +205,8 @@ export const ProductDetailModal: React.FC = () => {
                 Frequently Bought Together
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {relatedProducts.map((rel, relIdx) => (
-                  <div key={`rel-${rel.id}-${relIdx}`} className="flex items-center gap-3 p-2 bg-zinc-900 rounded-xl border border-zinc-800">
+                {relatedProducts.map((rel) => (
+                  <div key={rel.id} className="flex items-center gap-3 p-2 bg-zinc-900 rounded-xl border border-zinc-800">
                     <img src={rel.image} alt={rel.name} className="w-10 h-10 rounded-lg object-cover" />
                     <div className="flex-1 min-w-0 text-xs">
                       <p className="font-bold text-white truncate">{rel.name}</p>

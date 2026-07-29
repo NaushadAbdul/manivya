@@ -13,7 +13,7 @@ import {
   ChevronDown,
   PhoneCall
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const SEARCH_PLACEHOLDERS = [
   "Search 'Amul Taaza Milk'",
@@ -51,6 +51,11 @@ export const Navbar: React.FC = () => {
     }, 2800);
     return () => clearInterval(timer);
   }, []);
+
+  const defaultUserAddress = currentUser?.addresses?.find(a => a.isDefault) || currentUser?.addresses?.[0];
+  const displayLocationText = defaultUserAddress
+    ? (defaultUserAddress.fullAddress || `${defaultUserAddress.area}, Visakhapatnam - ${defaultUserAddress.pincode}`)
+    : selectedLocation.name;
 
   return (
     <header className="sticky top-0 z-40 bg-[#4A3060]/90 backdrop-blur-md border-b border-zinc-800/80 shadow-sm transition-colors">
@@ -100,7 +105,7 @@ export const Navbar: React.FC = () => {
                   📍 Service Area
                 </span>
                 <span className="text-xs font-semibold text-zinc-200 truncate">
-                  {selectedLocation.name}
+                  {displayLocationText}
                 </span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-zinc-500 shrink-0 ml-1" />
@@ -115,15 +120,17 @@ export const Navbar: React.FC = () => {
             >
               <div className="flex items-center gap-2.5 overflow-hidden">
                 <Search className="w-4 h-4 text-zinc-500 group-hover:text-zinc-200 transition-colors shrink-0" />
-                <motion.span
-                  key={placeholderIndex}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="truncate font-normal text-xs sm:text-sm text-zinc-400"
-                >
-                  {SEARCH_PLACEHOLDERS[placeholderIndex]}
-                </motion.span>
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={`sp-${placeholderIndex}`}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="truncate font-normal text-xs sm:text-sm text-zinc-400"
+                  >
+                    {SEARCH_PLACEHOLDERS[placeholderIndex]}
+                  </motion.span>
+                </AnimatePresence>
               </div>
               <span className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-medium bg-zinc-800 text-zinc-400 rounded border border-zinc-700/50">
                 ⌘K
@@ -216,7 +223,7 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-300 shrink-0 max-w-[130px]"
           >
             <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-bounce" />
-            <span className="truncate text-[11px] text-zinc-200 font-semibold">{selectedLocation.name}</span>
+            <span className="truncate text-[11px] text-zinc-200 font-semibold">{displayLocationText}</span>
             <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0" />
           </button>
 

@@ -100,11 +100,11 @@ export const LocationModal: React.FC = () => {
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-            {deliveryLocations.map((loc, locIdx) => {
+            {deliveryLocations.map((loc) => {
               const isSelected = selectedLocation.id === loc.id;
               return (
                 <button
-                  key={`loc-${loc.id}-${locIdx}`}
+                  key={loc.id}
                   onClick={() => handleSelectArea(loc)}
                   className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
                     isSelected

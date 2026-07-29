@@ -1,6 +1,5 @@
 import React from 'react';
 import { Order } from '../types';
-import { DeliveryMapTracker } from './DeliveryMapTracker';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -108,6 +107,37 @@ export const OrderNotificationModal: React.FC<OrderNotificationModalProps> = ({
                   </p>
                 </div>
 
+                {/* Order Confirmation / Payment Banner */}
+                {order.paymentMethod === 'COD' ? (
+                  <div className="p-3 bg-amber-950/80 border border-amber-500/40 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold text-amber-400 uppercase flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" /> Cash on Delivery Confirmed
+                      </span>
+                      <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                        Pay ₹{order.grandTotal || 0} at Doorstep
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-200">
+                      Order placed successfully with Cash on Delivery! Please keep ₹{order.grandTotal || 0} cash ready when the rider arrives.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-emerald-950/80 border border-emerald-500/40 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Payment Received & Confirmed
+                      </span>
+                      <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                        Admin Panel Updated
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-200">
+                      ₹{order.grandTotal || 0} received via QR Code ({order.paymentRef || '7207554777@sbi'}). The Admin has received your payment in the Store Admin Panel.
+                    </p>
+                  </div>
+                )}
+
                 {/* Delivery Progress Steps */}
                 <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 space-y-2">
                   <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase block">
@@ -165,7 +195,7 @@ export const OrderNotificationModal: React.FC<OrderNotificationModalProps> = ({
                     </span>
                     <div className="max-h-36 overflow-y-auto divide-y divide-zinc-800/60 pr-1">
                       {order.items.map((item: any, idx: number) => (
-                        <div key={`modal-item-${idx}`} className="py-1.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2">
+                        <div key={item.productId || `modal-item-${idx}`} className="py-1.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             {item.image && (
                               <img src={item.image} alt={item.productName} className="w-8 h-8 rounded-lg object-cover bg-zinc-800 shrink-0" />

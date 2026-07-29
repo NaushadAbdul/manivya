@@ -1,4 +1,4 @@
-import { db, doc, setDoc } from '../lib/firebase';
+import { db, doc, setDoc, deleteDoc } from '../lib/firebase';
 import { 
   Product, 
   CategoryInfo, 
@@ -250,17 +250,28 @@ export const api = {
     }
     const data = await res.json();
 
-    if (data.order) {
-      try {
-        await setDoc(doc(db, 'orders', data.order.id), {
-          status: 'cancelled'
-        }, { merge: true });
-      } catch (e) {
-        console.warn('Firestore cancel sync error:', e);
-      }
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+    } catch (e) {
+      console.warn('Firestore cancel sync error:', e);
     }
 
     return data;
+  },
+
+  async deleteOrder(orderId: string): Promise<boolean> {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error('Failed to delete order');
+    }
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+    } catch (e) {
+      console.warn('Firestore delete sync error:', e);
+    }
+    return true;
   },
 
   async updateOrderStatus(orderId: string, status: OrderStatus, token?: string): Promise<Order> {

@@ -50,14 +50,14 @@ export const CategoryBar: React.FC = () => {
           <span>All Items ({products.length})</span>
         </button>
 
-        {categories.map((cat, idx) => {
+        {categories.map((cat) => {
           const isSelected = selectedCategory === cat.id;
           const IconComp = ICON_MAP[cat.iconName] || Sparkles;
           const count = getCategoryCount(cat.id);
 
           return (
             <button
-              key={`cat-${cat.id}-${idx}`}
+              key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border shrink-0 ${
                 isSelected

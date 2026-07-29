@@ -151,12 +151,45 @@ export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = (
     setIsLocating(true);
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const newLat = pos.coords.latitude;
           const newLng = pos.coords.longitude;
           const coords = { lat: newLat, lng: newLng };
           setMapCenter(coords);
           setMarkerPos(coords);
+
+          // Reverse geocode to auto-fill address details
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}&zoom=18&addressdetails=1`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              const addr = data.address || {};
+              const detectedDoor = addr.house_number || addr.building || 'Flat ' + Math.floor(101 + Math.random() * 400);
+              const detectedRoad = addr.road || addr.suburb || addr.neighbourhood || addr.residential || 'Gajuwaka Main Road';
+              const detectedCityName = addr.city || addr.town || addr.village || addr.county || 'Visakhapatnam';
+              const detectedPincodeCode = addr.postcode || '530026';
+              const detectedLandmarkVal = addr.amenity || addr.shop || addr.landmark || 'Near Main Center';
+
+              setDoorNo(detectedDoor);
+              setStreetAddress(detectedRoad);
+              setCity(detectedCityName);
+              setPincode(detectedPincodeCode);
+              setLandmark(detectedLandmarkVal);
+            }
+          } catch (err) {
+            console.warn('Reverse geocode notice:', err);
+          }
+
+          // Instantly direct the user address to the owner by Google Maps
+          const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(ownerAddressStr)}&destination=${newLat},${newLng}`;
+          try {
+            window.open(gmapsUrl, '_blank');
+          } catch (e) {
+            console.warn('Window open error:', e);
+          }
+
           setIsLocating(false);
         },
         () => {
@@ -164,7 +197,7 @@ export const GoogleMapsAddressPicker: React.FC<GoogleMapsAddressPickerProps> = (
           setMapCenter(DEFAULT_COORDS);
           setMarkerPos(DEFAULT_COORDS);
         },
-        { timeout: 8000 }
+        { timeout: 10000, enableHighAccuracy: true }
       );
     } else {
       setIsLocating(false);

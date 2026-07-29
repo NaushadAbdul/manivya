@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { ManivyaLogo } from './ManivyaLogo';
-import { DeliveryMapTracker } from './DeliveryMapTracker';
 import { OrderNotificationModal } from './OrderNotificationModal';
 import { OrderDetailModal } from './OrderDetailModal';
 import { api } from '../services/api';
@@ -61,10 +60,13 @@ export const OrdersModal: React.FC = () => {
     if (!confirm(`Are you sure you want to cancel Order #${order.id}?`)) return;
 
     try {
-      await api.updateOrderStatus(order.id, 'cancelled');
-      setCancelledOrder(order);
-      setIsCancelModalOpen(true);
-      addToast(`🚨 Order #${order.id} was CANCELLED successfully`, 'error');
+      await api.cancelOrder(order.id, 'Cancelled by customer');
+      setOrders(prev => prev.filter(o => o.id !== order.id));
+      if (selectedDetailOrder?.id === order.id) {
+        setSelectedDetailOrder(null);
+        setIsDetailModalOpen(false);
+      }
+      addToast(`🚨 Order #${order.id} was CANCELLED and deleted`, 'error');
       fetchOrders();
     } catch (err: any) {
       addToast(err.message || 'Failed to cancel order', 'error');
@@ -109,7 +111,7 @@ export const OrdersModal: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-base font-extrabold text-white">
-                  My Orders & Live Tracking
+                  My Orders
                 </h2>
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400 mt-0.5">
                   <ManivyaLogo className="h-4" />
@@ -136,16 +138,17 @@ export const OrdersModal: React.FC = () => {
               <div className="text-center py-12">
                 <p className="text-sm font-bold text-zinc-300">No orders placed yet!</p>
                 <p className="text-xs text-zinc-400 mt-1">
-                  Place an order for Amul milk, ice creams, stationery or merch to see live tracking.
+                  Place an order for Amul milk, ice creams, stationery or merch to see your order history.
                 </p>
               </div>
             ) : (
-              orders.map((order, orderIdx) => {
+              orders.map((order) => {
                 const currentStep = getStepIndex(order.orderStatus);
+                const isCancelled = order.orderStatus === 'cancelled';
 
                 return (
                   <div
-                    key={`order-${order.id}-${orderIdx}`}
+                    key={order.id}
                     className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-4 shadow-xs"
                   >
                     {/* Top Order Meta */}
@@ -153,8 +156,12 @@ export const OrdersModal: React.FC = () => {
                       <div>
                         <div className="flex items-center gap-2 font-mono text-xs">
                           <span className="font-extrabold text-white">ORDER #{order.id}</span>
-                          <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold uppercase text-[10px]">
-                            {order.paymentStatus} ({order.paymentMethod})
+                          <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] border ${
+                            isCancelled 
+                              ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                              : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                          }`}>
+                            {isCancelled ? 'CANCELLED' : `${order.paymentStatus} (${order.paymentMethod})`}
                           </span>
                         </div>
                         <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
@@ -174,8 +181,8 @@ export const OrdersModal: React.FC = () => {
                           <Eye className="w-3.5 h-3.5" /> View Details
                         </button>
 
-                        {/* Cancel Order Button (Active orders) */}
-                        {(order.orderStatus === 'placed' || order.orderStatus === 'packing') && (
+                        {/* Cancel Order Button (Any active non-delivered/non-cancelled order) */}
+                        {!isCancelled && order.orderStatus !== 'delivered' && (
                           <button
                             onClick={() => handleCancelOrder(order)}
                             className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors"
@@ -204,44 +211,41 @@ export const OrdersModal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Live Tracking Timeline Stepper */}
-                    <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                      <div className="text-[10px] font-mono font-bold text-zinc-500 uppercase mb-2">
-                        Live Order Progress
-                      </div>
-                      
-                      <div className="grid grid-cols-4 gap-2 text-center">
-                        {STATUS_STEPS.map((step, idx) => {
-                          const isCompleted = idx <= currentStep;
-                          const isCurrent = idx === currentStep;
+                    {/* Order Status Progress or Cancelled Banner */}
+                    {!isCancelled ? (
+                      <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800">
+                        <div className="text-[10px] font-mono font-bold text-zinc-500 uppercase mb-2">
+                          Order Progress
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          {STATUS_STEPS.map((step, idx) => {
+                            const isCompleted = idx <= currentStep;
+                            const isCurrent = idx === currentStep;
 
-                          return (
-                            <div key={`step-${step.status}-${idx}`} className="flex flex-col items-center">
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center font-mono text-xs font-bold transition-all ${
-                                isCompleted
-                                  ? 'bg-blue-500 text-black font-bold shadow-sm'
-                                  : 'bg-zinc-800 text-zinc-500'
-                              } ${isCurrent ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-zinc-900' : ''}`}>
-                                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
+                            return (
+                              <div key={`step-${step.status}-${idx}`} className="flex flex-col items-center">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-mono text-xs font-bold transition-all ${
+                                  isCompleted
+                                    ? 'bg-blue-500 text-black font-bold shadow-sm'
+                                    : 'bg-zinc-800 text-zinc-500'
+                                } ${isCurrent ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-zinc-900' : ''}`}>
+                                  {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
+                                </div>
+                                <span className={`text-[11px] font-bold mt-1 ${isCompleted ? 'text-white' : 'text-zinc-500'}`}>
+                                  {step.label}
+                                </span>
                               </div>
-                              <span className={`text-[11px] font-bold mt-1 ${isCompleted ? 'text-white' : 'text-zinc-500'}`}>
-                                {step.label}
-                              </span>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Google Maps From and To Live Tracking */}
-                    <DeliveryMapTracker
-                      fromAddress="25-1-13, Gajuwaka Bypass Rd, Durgavanipalem, Pedagantyada, Visakhapatnam, Gajuwaka, Andhra Pradesh 530026"
-                      toAddress={`${order.deliveryAddress.fullAddress}, ${order.deliveryAddress.area}, ${order.deliveryAddress.pincode}`}
-                      orderId={order.id}
-                      etaMinutes={order.deliveryEtaMinutes || 8}
-                      riderName={order.driverName || "Ramu K. (MANIVYA Rider)"}
-                      riderPhone={order.driverPhone || "7207554777"}
-                    />
+                    ) : (
+                      <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl flex items-center gap-2.5 text-red-300 text-xs font-mono">
+                        <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        <span>Order was cancelled by customer.</span>
+                      </div>
+                    )}
 
                     {/* Items List */}
                     <div className="space-y-1.5">
