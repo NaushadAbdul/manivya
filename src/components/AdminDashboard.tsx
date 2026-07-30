@@ -95,6 +95,8 @@ export const AdminDashboard: React.FC = () => {
     deleteDeliveryLocation
   } = useStore();
 
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [passcode, setPasscode] = useState('');
@@ -150,7 +152,7 @@ export const AdminDashboard: React.FC = () => {
   const fetchMongoStatus = async () => {
     if (!adminToken) return;
     try {
-      const res = await api.getMongoDBStatus();
+      const res = await api.getMongoDBStatus(adminToken);
       setMongoStatus(res);
     } catch (e) {
       console.warn('MongoDB status fetch error:', e);
@@ -161,7 +163,7 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     setIsTestingMongo(true);
     try {
-      const res = await api.connectMongoDB(mongoInputUri.trim() || undefined);
+      const res = await api.connectMongoDB(mongoInputUri.trim() || undefined, adminToken);
       setMongoStatus(res.status || res);
       if (res.connected) {
         addToast('✅ Successfully connected to MongoDB Atlas Cloud Cluster!', 'success');
@@ -279,18 +281,25 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleFirebaseGoogleLogin = async () => {
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminName.trim() || !adminEmail.trim() || !adminPassword.trim()) {
+      addToast('Please enter your name, email, and password.', 'error');
+      return;
+    }
     setIsSubmittingAuth(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const firebaseUser = result.user;
-      const idToken = await firebaseUser.getIdToken();
-      const res = await api.verifyFirebaseAdmin(idToken, firebaseUser.email || undefined);
+      const res = await api.adminRegister({
+        name: adminName.trim(),
+        email: adminEmail.trim(),
+        password: adminPassword.trim()
+      });
       adminLogin(res.token);
       setIsVerified(true);
-      addToast(`Verified Firebase Admin: ${firebaseUser.email}`, 'success');
+      setAdminPassword('');
+      addToast(`Admin account created successfully! Welcome, ${res.user?.name || adminName}`, 'success');
     } catch (err: any) {
-      addToast(err.message || 'Firebase Authentication failed or non-admin account.', 'error');
+      addToast(err.message || 'Failed to create admin account', 'error');
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -522,82 +531,141 @@ export const AdminDashboard: React.FC = () => {
 
             <div className="text-center space-y-1">
               <h1 className="text-xl font-black text-white tracking-tight">
-                Administrator Access Portal
+                {authMode === 'login' ? 'Administrator Access Portal' : 'Create Admin Account'}
               </h1>
               <p className="text-xs text-zinc-400">
-                Restricted System • Authenticate with verified Admin credentials.
+                {authMode === 'login' 
+                  ? 'Restricted System • Authenticate with email & password.' 
+                  : 'Register a new Administrator account with email and password.'}
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
-                  Admin Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="enter admin email"
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
-                />
-              </div>
+            {authMode === 'login' ? (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
+                    Admin Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="admin@manivya.com"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
+                    Admin Password / Passcode
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
+                    autoFocus
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingAuth}
+                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2 font-mono uppercase tracking-wider"
+                >
+                  {isSubmittingAuth ? 'Authenticating...' : 'Sign In to Admin Portal'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={adminName}
+                    onChange={(e) => setAdminName(e.target.value)}
+                    placeholder="e.g. John Doe"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
+                    Admin Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="admin@manivya.com"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
+                    Create Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingAuth}
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2 font-mono uppercase tracking-wider"
+                >
+                  {isSubmittingAuth ? 'Creating Account...' : 'Create Admin Account'}
+                </button>
+              </form>
+            )}
+
+            <div className="pt-2 text-center space-y-3">
+              {authMode === 'login' ? (
+                <p className="text-xs text-zinc-400">
+                  Need a new admin account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('register')}
+                    className="text-blue-400 font-bold hover:underline"
+                  >
+                    Create Admin Account
+                  </button>
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-400">
+                  Already have an admin account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('login')}
+                    className="text-blue-400 font-bold hover:underline"
+                  >
+                    Sign In
+                  </button>
+                </p>
+              )}
 
               <div>
-                <label className="block text-xs font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
-                  Admin Password / Passcode
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-white text-sm outline-none focus:border-blue-500 transition-colors"
-                  autoFocus
-                />
+                <Link
+                  to="/"
+                  className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors underline"
+                >
+                  ← Return to Public Storefront
+                </Link>
               </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingAuth}
-                className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2 font-mono uppercase tracking-wider"
-              >
-                {isSubmittingAuth ? 'Authenticating...' : 'Sign In to Admin Portal'}
-              </button>
-            </form>
-
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-zinc-800" />
-              <span className="flex-shrink mx-3 text-[11px] font-mono text-zinc-500 uppercase">
-                OR
-              </span>
-              <div className="flex-grow border-t border-zinc-800" />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleFirebaseGoogleLogin}
-              disabled={isSubmittingAuth}
-              className="w-full py-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-bold text-xs font-mono transition-all flex items-center justify-center gap-2"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-              </svg>
-              <span>Sign In as Admin with Google</span>
-            </button>
-
-            <div className="text-center pt-2">
-              <Link
-                to="/"
-                className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors underline"
-              >
-                ← Return to Public Storefront
-              </Link>
             </div>
           </div>
         ) : (
