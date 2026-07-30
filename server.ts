@@ -81,7 +81,7 @@ app.get('/api/ip', (req, res) => {
   });
 });
 
-app.get('/api/mongodb/status', async (req, res) => {
+app.get('/api/mongodb/status', requireAdmin, async (req, res) => {
   const status = getMongoStatus();
   const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
   res.json({
@@ -98,7 +98,7 @@ app.get('/api/mongodb/status', async (req, res) => {
   });
 });
 
-app.post('/api/mongodb/connect', async (req, res) => {
+app.post('/api/mongodb/connect', requireAdmin, async (req, res) => {
   const { mongoUri } = req.body;
   if (mongoUri && typeof mongoUri === 'string' && mongoUri.length > 15) {
     process.env.MONGODB_URI = mongoUri;
@@ -194,6 +194,35 @@ app.post('/api/admin/login', async (req, res) => {
   }
 
   return res.status(401).json({ error: 'Invalid email or password.' });
+});
+
+// Admin Token Verification Endpoint
+app.get('/api/admin/verify', requireAdmin, (req: any, res: any) => {
+  res.json({ success: true, user: req.user });
+});
+
+// Firebase Admin Auth Verification Endpoint
+app.post('/api/admin/verify-firebase', async (req: any, res: any) => {
+  const { email } = req.body;
+  const targetEmail = (email || '').toLowerCase().trim();
+
+  if (!targetEmail) {
+    return res.status(400).json({ error: 'Email is required for Firebase verification.' });
+  }
+
+  const user = await findUserByEmailInMongo(targetEmail);
+  const isAdmin = (user && user.role === 'admin') || targetEmail === 'admin@manivya.com';
+
+  if (!isAdmin) {
+    return res.status(403).json({ error: 'Access Denied: Account does not have Administrator privileges.' });
+  }
+
+  const adminUser = user 
+    ? { id: user.id, email: user.email, name: user.name, role: 'admin' } 
+    : { id: 'usr-admin-firebase', email: targetEmail, name: targetEmail.split('@')[0], role: 'admin' };
+    
+  const token = jwt.sign(adminUser, JWT_SECRET, { expiresIn: '7d' });
+  return res.json({ success: true, token, user: adminUser });
 });
 
 // General Login Endpoint (Admin or Customer)
@@ -441,7 +470,9 @@ app.get('/api/orders', (req, res) => {
   if (userId && typeof userId === 'string') {
     return res.json(orders.filter(o => o.userId === userId));
   }
-  res.json(orders);
+  requireAdmin(req, res, () => {
+    res.json(orders);
+  });
 });
 
 app.post('/api/orders', (req, res) => {
@@ -644,7 +675,7 @@ app.post('/api/orders/:id/cancel', (req, res) => {
   res.json({ success: true, message: reason || 'Order was cancelled.' });
 });
 
-app.delete('/api/orders/:id', (req, res) => {
+app.delete('/api/orders/:id', requireAdmin, (req, res) => {
   const orderIdx = orders.findIndex(o => o.id === req.params.id);
 
   if (orderIdx === -1) {

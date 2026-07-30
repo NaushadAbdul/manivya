@@ -8,7 +8,6 @@ import {
   Sparkles, 
   Heart, 
   PackageCheck, 
-  Lock, 
   User as UserIcon,
   ChevronDown,
   PhoneCall
@@ -34,12 +33,10 @@ export const Navbar: React.FC = () => {
     setIsAIAssistantOpen,
     setIsOrdersModalOpen,
     setIsAuthModalOpen,
-    setIsAdminModalOpen,
     cartCount,
     cartItemTotal,
     wishlist,
     currentUser,
-    adminToken,
     businessInfo
   } = useStore();
 
@@ -181,17 +178,6 @@ export const Navbar: React.FC = () => {
                 {currentUser?.name.split(' ')[0] || 'Login'}
               </span>
             </button>
-
-            {/* Owner Admin Shortcut - Only shown if logged in as Admin */}
-            {adminToken && (
-              <button
-                onClick={() => setIsAdminModalOpen(true)}
-                className="p-2 sm:p-2.5 rounded-xl border bg-amber-500/10 border-amber-500/40 text-amber-400 transition-all"
-                title="Owner Panel Unlocked"
-              >
-                <Lock className="w-4 h-4" />
-              </button>
-            )}
 
             {/* Cart Pill Trigger */}
             <button

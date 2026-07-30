@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { ToastContainer } from './components/ToastContainer';
 import { Navbar } from './components/Navbar';
@@ -37,27 +38,8 @@ const MainContent: React.FC = () => {
     setSelectedCategory,
     setIsAIAssistantOpen,
     setIsCartOpen,
-    setIsAdminModalOpen,
     cartCount
   } = useStore();
-
-  useEffect(() => {
-    // Check if URL path or hash specifies admin route
-    const path = window.location.pathname.toLowerCase();
-    const hash = window.location.hash.toLowerCase();
-    if (path.includes('/admin') || hash.includes('admin')) {
-      setIsAdminModalOpen(true);
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        setIsAdminModalOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setIsAdminModalOpen]);
 
   const [filterType, setFilterType] = useState<'all' | 'bestsellers' | 'deals' | 'trending'>('all');
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'rating'>('default');
@@ -254,7 +236,6 @@ const MainContent: React.FC = () => {
       <OrdersModal />
       <AuthModal />
       <AIAssistantModal />
-      <AdminDashboard />
 
       {/* Footer */}
       <Footer />
@@ -265,9 +246,15 @@ const MainContent: React.FC = () => {
 
 export default function App() {
   return (
-    <StoreProvider>
-      <ToastContainer />
-      <MainContent />
-    </StoreProvider>
+    <Router>
+      <StoreProvider>
+        <ToastContainer />
+        <Routes>
+          <Route path="/" element={<MainContent />} />
+          <Route path="/manivya-dashboard" element={<AdminDashboard />} />
+          <Route path="*" element={<MainContent />} />
+        </Routes>
+      </StoreProvider>
+    </Router>
   );
 }

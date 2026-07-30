@@ -427,7 +427,7 @@ export const api = {
   // Auth & Admin API
   async adminLogin(payload: { email?: string; password?: string; passcode?: string } | string): Promise<{ success: boolean; token: string; user?: any }> {
     const body = typeof payload === 'string' 
-      ? { passcode: payload, email: 'admin@manivya.com' } 
+      ? { passcode: payload } 
       : payload;
 
     const res = await fetch('/api/admin/login', {
@@ -439,6 +439,30 @@ export const api = {
     const data = await res.json();
     if (!res.ok || !data.success) {
       throw new Error(data.error || 'Invalid admin credentials');
+    }
+    return data;
+  },
+
+  async verifyAdminToken(token: string): Promise<{ success: boolean; user: any }> {
+    const res = await fetch('/api/admin/verify', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Admin token verification failed');
+    }
+    return data;
+  },
+
+  async verifyFirebaseAdmin(idToken: string, email?: string): Promise<{ success: boolean; token: string; user: any }> {
+    const res = await fetch('/api/admin/verify-firebase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken, email })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Firebase admin verification failed');
     }
     return data;
   },

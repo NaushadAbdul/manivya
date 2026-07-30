@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const Footer: React.FC = () => {
-  const { businessInfo, setSelectedCategory, setIsAIAssistantOpen, setIsAdminModalOpen } = useStore();
+  const { businessInfo, setSelectedCategory, setIsAIAssistantOpen } = useStore();
 
   return (
     <footer className="bg-[#4A3060] text-zinc-400 border-t border-purple-900/40 transition-colors pt-12 pb-8 px-4 sm:px-6 lg:px-8 mt-16 font-sans">

@@ -82,8 +82,9 @@ export function formatNameFromEmail(email: string): string {
 }
 
 // Database initialization with fallback if custom databaseId is supplied
-export const db = firebaseConfig.firestoreDatabaseId 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+const configObj = firebaseConfig as Record<string, any>;
+export const db = configObj.firestoreDatabaseId 
+  ? getFirestore(app, configObj.firestoreDatabaseId)
   : getFirestore(app);
 
 // Diagnostic and Error Classification for Firebase Auth on Mobile & Web
