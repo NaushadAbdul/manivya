@@ -37,7 +37,17 @@ import {
   Phone,
   Database,
   Server,
-  HardDrive
+  HardDrive,
+  Mail,
+  CreditCard,
+  Box,
+  Truck,
+  XCircle,
+  Filter,
+  ExternalLink,
+  User,
+  Clock,
+  QrCode
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -216,6 +226,10 @@ export const AdminDashboard: React.FC = () => {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [selectedAdminOrder, setSelectedAdminOrder] = useState<Order | null>(null);
   const [isAdminDetailOpen, setIsAdminDetailOpen] = useState(false);
+  const [selectedOrderEmail, setSelectedOrderEmail] = useState<string>('all');
+  const [orderSearchQuery, setOrderSearchQuery] = useState<string>('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
 
   // Coupons state
   const [allCoupons, setAllCoupons] = useState<Coupon[]>([]);
@@ -1231,24 +1245,145 @@ export const AdminDashboard: React.FC = () => {
                 )}
 
                 {/* TAB 4: Orders Manager */}
-                {activeTab === 'orders' && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-mono font-bold text-zinc-400 uppercase">Customer Orders ({allOrders.length})</h3>
-                    {allOrders.map((ord, ordIdx) => (
-                      <div key={`admin-ord-${ord.id}-${ordIdx}`} className="p-3 rounded-2xl border border-zinc-800 bg-zinc-950 text-xs space-y-2.5">
-                        <div className="flex justify-between font-mono font-bold">
-                          <span className="text-white">ORDER #{ord.id} • {ord.userName}</span>
-                          <span className="text-emerald-400">₹{ord.grandTotal}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-800/60">
+                {activeTab === 'orders' && (() => {
+                  const uniqueCustomerEmails = Array.from(
+                    new Set(allOrders.map(o => (o.userEmail || '').trim().toLowerCase()).filter(Boolean))
+                  );
+
+                  const filteredOrders = allOrders.filter(ord => {
+                    // Email Filter
+                    if (selectedOrderEmail !== 'all') {
+                      if ((ord.userEmail || '').trim().toLowerCase() !== selectedOrderEmail) {
+                        return false;
+                      }
+                    }
+
+                    // Status Filter
+                    if (orderStatusFilter !== 'all') {
+                      if (ord.orderStatus !== orderStatusFilter) {
+                        return false;
+                      }
+                    }
+
+                    // Payment Method Filter
+                    if (paymentMethodFilter !== 'all') {
+                      if (paymentMethodFilter === 'COD') {
+                        if (ord.paymentMethod !== 'COD') return false;
+                      } else if (paymentMethodFilter === 'UPI') {
+                        if (ord.paymentMethod === 'COD') return false;
+                      }
+                    }
+
+                    // Search Query
+                    if (orderSearchQuery.trim()) {
+                      const q = orderSearchQuery.toLowerCase().trim();
+                      const matchId = ord.id.toLowerCase().includes(q);
+                      const matchName = ord.userName.toLowerCase().includes(q);
+                      const matchEmail = (ord.userEmail || '').toLowerCase().includes(q);
+                      const matchPhone = ord.userPhone.includes(q);
+                      const matchLocation = (ord.deliveryAddress?.fullAddress || '').toLowerCase().includes(q) || (ord.deliveryAddress?.area || '').toLowerCase().includes(q);
+                      const matchItems = ord.items.some(i => i.productName.toLowerCase().includes(q) || i.brand.toLowerCase().includes(q));
+
+                      return matchId || matchName || matchEmail || matchPhone || matchLocation || matchItems;
+                    }
+
+                    return true;
+                  });
+
+                  const selectedEmailOrders = selectedOrderEmail !== 'all' 
+                    ? allOrders.filter(o => (o.userEmail || '').trim().toLowerCase() === selectedOrderEmail)
+                    : filteredOrders;
+
+                  const totalRevenueAll = allOrders.filter(o => o.orderStatus !== 'cancelled').reduce((acc, o) => acc + o.grandTotal, 0);
+                  const totalCancelledAll = allOrders.filter(o => o.orderStatus === 'cancelled').length;
+                  const totalActiveAll = allOrders.filter(o => o.orderStatus !== 'cancelled').length;
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Top Header & Summary Chips */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-950 p-4 rounded-2xl border border-zinc-800">
+                        <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-zinc-400 font-mono">Status:</span>
+                            <ShoppingBag className="w-5 h-5 text-blue-400" />
+                            <h3 className="text-base font-extrabold text-white">
+                              Customer Orders & Database Sync ({filteredOrders.length} / {allOrders.length})
+                            </h3>
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            Real-time orders tracked by individual user login emails, items, payment types, & delivery locations in MongoDB Atlas.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={fetchAdminData}
+                          className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-mono font-bold text-zinc-300 flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-blue-400" /> Sync Atlas Orders
+                        </button>
+                      </div>
+
+                      {/* Global Orders Stats Summary Bar */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1">
+                          <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Total Orders</p>
+                          <p className="text-lg font-black text-white font-mono">{allOrders.length}</p>
+                        </div>
+                        <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1">
+                          <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Active Orders</p>
+                          <p className="text-lg font-black text-emerald-400 font-mono">{totalActiveAll}</p>
+                        </div>
+                        <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1">
+                          <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Cancelled Orders</p>
+                          <p className="text-lg font-black text-red-400 font-mono">{totalCancelledAll}</p>
+                        </div>
+                        <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1">
+                          <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Total Revenue</p>
+                          <p className="text-lg font-black text-amber-400 font-mono">₹{totalRevenueAll.toLocaleString('en-IN')}</p>
+                        </div>
+                      </div>
+
+                      {/* Filter Bar: Individual Email, Status, Payment, Search */}
+                      <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-3">
+                        <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-400 uppercase">
+                          <Filter className="w-4 h-4 text-blue-400" />
+                          <span>Filter Orders by Individual Email & Specifications</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                          {/* Filter by Individual Customer Email */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono text-zinc-400 font-bold block uppercase">
+                              Filter by Customer Email
+                            </label>
                             <select
-                              value={ord.orderStatus}
-                              onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value as any)}
-                              className="bg-zinc-900 border border-zinc-800 p-1 rounded font-bold font-mono text-blue-400"
+                              value={selectedOrderEmail}
+                              onChange={(e) => setSelectedOrderEmail(e.target.value)}
+                              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-blue-300 focus:outline-none focus:border-blue-500"
                             >
-                              <option value="placed">Order Confirmed</option>
+                              <option value="all">All Customer Emails ({uniqueCustomerEmails.length})</option>
+                              {uniqueCustomerEmails.map(email => {
+                                const count = allOrders.filter(o => (o.userEmail || '').trim().toLowerCase() === email).length;
+                                return (
+                                  <option key={`opt-email-${email}`} value={email}>
+                                    {email} ({count} orders)
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          {/* Filter by Order Status */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono text-zinc-400 font-bold block uppercase">
+                              Filter by Order Status
+                            </label>
+                            <select
+                              value={orderStatusFilter}
+                              onChange={(e) => setOrderStatusFilter(e.target.value)}
+                              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-200 focus:outline-none focus:border-blue-500"
+                            >
+                              <option value="all">All Statuses</option>
+                              <option value="placed">Confirmed / Placed</option>
                               <option value="packing">Packing</option>
                               <option value="out_for_delivery">Out for Delivery</option>
                               <option value="delivered">Delivered</option>
@@ -1256,20 +1391,330 @@ export const AdminDashboard: React.FC = () => {
                             </select>
                           </div>
 
-                          <button
-                            onClick={() => {
-                              setSelectedAdminOrder(ord);
-                              setIsAdminDetailOpen(true);
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> View Details
-                          </button>
+                          {/* Filter by Payment Method */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono text-zinc-400 font-bold block uppercase">
+                              Payment Type
+                            </label>
+                            <select
+                              value={paymentMethodFilter}
+                              onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-zinc-200 focus:outline-none focus:border-blue-500"
+                            >
+                              <option value="all">All Payment Types</option>
+                              <option value="UPI">UPI / Online Payment</option>
+                              <option value="COD">Cash on Delivery (COD)</option>
+                            </select>
+                          </div>
+
+                          {/* Search Input */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono text-zinc-400 font-bold block uppercase">
+                              Search Order / Address / Items
+                            </label>
+                            <div className="relative">
+                              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-2.5" />
+                              <input
+                                type="text"
+                                value={orderSearchQuery}
+                                onChange={(e) => setOrderSearchQuery(e.target.value)}
+                                placeholder="Order ID, Name, Item, Location..."
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      {/* Selected Customer Email Summary Banner (if email filter is active) */}
+                      {selectedOrderEmail !== 'all' && (
+                        <div className="p-4 bg-gradient-to-r from-blue-950/40 via-zinc-950 to-indigo-950/40 border border-blue-500/30 rounded-2xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-4 h-4 text-blue-400" />
+                              <span className="text-xs font-mono font-bold text-blue-300">
+                                Analytics for Customer: <span className="text-white font-black underline">{selectedOrderEmail}</span>
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => setSelectedOrderEmail('all')}
+                              className="text-[10px] font-mono text-zinc-400 hover:text-white underline"
+                            >
+                              Clear Email Filter
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-xs">
+                            <div className="bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
+                              <span className="text-[10px] text-zinc-400 block">Total Orders</span>
+                              <span className="font-extrabold text-white">{selectedEmailOrders.length}</span>
+                            </div>
+                            <div className="bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
+                              <span className="text-[10px] text-zinc-400 block">Total Items Purchased</span>
+                              <span className="font-extrabold text-emerald-400">
+                                {selectedEmailOrders.reduce((sum, o) => sum + o.items.reduce((iSum, i) => iSum + i.quantity, 0), 0)} items
+                              </span>
+                            </div>
+                            <div className="bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
+                              <span className="text-[10px] text-zinc-400 block">Active vs Cancelled</span>
+                              <span className="font-extrabold text-zinc-200">
+                                {selectedEmailOrders.filter(o => o.orderStatus !== 'cancelled').length} active / {selectedEmailOrders.filter(o => o.orderStatus === 'cancelled').length} cancelled
+                              </span>
+                            </div>
+                            <div className="bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
+                              <span className="text-[10px] text-zinc-400 block">Total Spend</span>
+                              <span className="font-extrabold text-amber-400">
+                                ₹{selectedEmailOrders.filter(o => o.orderStatus !== 'cancelled').reduce((sum, o) => sum + o.grandTotal, 0)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Orders List Display */}
+                      {filteredOrders.length === 0 ? (
+                        <div className="p-8 text-center bg-zinc-950 rounded-2xl border border-zinc-800 text-zinc-400 space-y-2">
+                          <ShoppingBag className="w-8 h-8 text-zinc-600 mx-auto" />
+                          <p className="text-sm font-bold text-zinc-300">No orders match your filter criteria.</p>
+                          <p className="text-xs text-zinc-500">Try clearing your search query or selecting a different email/status filter.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {filteredOrders.map((ord, ordIdx) => {
+                            const isCancelled = ord.orderStatus === 'cancelled';
+                            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              `${ord.deliveryAddress?.fullAddress || ''}, ${ord.deliveryAddress?.area || ''} Visakhapatnam ${ord.deliveryAddress?.pincode || ''}`
+                            )}`;
+
+                            return (
+                              <div
+                                key={`admin-ord-${ord.id}-${ordIdx}`}
+                                className={`p-4 sm:p-5 rounded-3xl border transition-all space-y-4 ${
+                                  isCancelled
+                                    ? 'bg-red-950/10 border-red-900/30'
+                                    : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                                }`}
+                              >
+                                {/* Order ID Header & Status Badge */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-800/80">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-extrabold font-mono text-xs">
+                                      #{ord.id.replace('MNE-', '')}
+                                    </div>
+                                    <div>
+                                      <h4 className="text-sm font-black text-white font-mono flex items-center gap-2">
+                                        ORDER #{ord.id}
+                                      </h4>
+                                      <p className="text-[11px] text-zinc-400 font-mono">
+                                        Placed: {new Date(ord.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {/* Order Status Badge */}
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${
+                                      ord.orderStatus === 'delivered'
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                        : ord.orderStatus === 'out_for_delivery'
+                                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                        : ord.orderStatus === 'packing'
+                                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                        : ord.orderStatus === 'placed'
+                                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                                        : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                    }`}>
+                                      {ord.orderStatus === 'delivered' && '✅ Delivered'}
+                                      {ord.orderStatus === 'out_for_delivery' && '🚚 Out for Delivery'}
+                                      {ord.orderStatus === 'packing' && '📦 Packing Items'}
+                                      {ord.orderStatus === 'placed' && '🕒 Order Confirmed'}
+                                      {ord.orderStatus === 'cancelled' && '❌ Cancelled'}
+                                    </span>
+
+                                    <span className="text-base font-black text-emerald-400 font-mono">
+                                      ₹{ord.grandTotal}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Who Ordered (Customer Info) & From Where (Location) Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {/* Who Ordered */}
+                                  <div className="p-3.5 bg-zinc-900/60 rounded-2xl border border-zinc-800/80 space-y-2 text-xs">
+                                    <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-zinc-400 uppercase">
+                                      <User className="w-3.5 h-3.5 text-blue-400" />
+                                      <span>Who Ordered (Customer Details)</span>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-white text-sm">{ord.userName}</span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 pt-1">
+                                        <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                        <span className="text-blue-300 font-mono font-bold bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded text-[11px]">
+                                          {ord.userEmail || 'No Email Associated'}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 pt-1">
+                                        <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                        <span className="text-zinc-300 font-mono font-bold">
+                                          +91 {ord.userPhone}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* From Where He Ordered (User Location) */}
+                                  <div className="p-3.5 bg-zinc-900/60 rounded-2xl border border-zinc-800/80 space-y-2 text-xs">
+                                    <div className="flex items-center justify-between text-[10px] font-mono font-bold text-zinc-400 uppercase">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>From Where He Ordered (User Location)</span>
+                                      </div>
+                                      <a
+                                        href={mapsUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-[10px] lowercase"
+                                      >
+                                        <ExternalLink className="w-3 h-3" /> maps
+                                      </a>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <p className="font-bold text-white text-xs">
+                                        {ord.deliveryAddress?.title || 'Delivery Address'} • {ord.deliveryAddress?.pincode}
+                                      </p>
+                                      <p className="text-zinc-300 font-mono text-[11px] leading-relaxed">
+                                        {ord.deliveryAddress?.fullAddress}
+                                      </p>
+                                      {ord.deliveryAddress?.landmark && (
+                                        <p className="text-zinc-400 text-[11px] italic">
+                                          Landmark: {ord.deliveryAddress.landmark}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* What Items the User Ordered */}
+                                <div className="p-3.5 bg-zinc-900/60 rounded-2xl border border-zinc-800/80 space-y-2.5 text-xs">
+                                  <div className="flex items-center justify-between text-[10px] font-mono font-bold text-zinc-400 uppercase">
+                                    <div className="flex items-center gap-2">
+                                      <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>Items Ordered ({ord.items.reduce((acc, i) => acc + i.quantity, 0)} Items)</span>
+                                    </div>
+                                    <span className="text-zinc-400">Subtotal: ₹{ord.itemTotal}</span>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {ord.items.map((item, itemIdx) => (
+                                      <div key={`ord-item-${ord.id}-${itemIdx}`} className="p-2 bg-zinc-950 rounded-xl border border-zinc-800/80 flex items-center justify-between gap-2.5">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <img
+                                            src={item.image || "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&q=80&w=200"}
+                                            alt={item.productName}
+                                            className="w-9 h-9 rounded-lg object-cover shrink-0 border border-zinc-800 bg-zinc-900"
+                                          />
+                                          <div className="min-w-0">
+                                            <p className="font-bold text-white truncate text-xs">
+                                              {item.productName}
+                                            </p>
+                                            <p className="text-[10px] text-zinc-400 font-mono">
+                                              {item.brand} • {item.unit}
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="text-right shrink-0 font-mono text-xs font-bold text-zinc-200">
+                                          <span>{item.quantity}x</span>
+                                          <span className="block text-[10px] text-emerald-400">₹{item.price * item.quantity}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Payment Type & Grand Total Breakdown */}
+                                <div className="p-3.5 bg-zinc-900/60 rounded-2xl border border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <CreditCard className="w-4 h-4 text-purple-400" />
+                                      <span className="text-[11px] font-mono text-zinc-400 uppercase font-bold">Payment Method:</span>
+                                    </div>
+
+                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold font-mono border uppercase ${
+                                      ord.paymentMethod === 'COD'
+                                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                        : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                    }`}>
+                                      {ord.paymentMethod === 'COD' ? '💵 Cash on Delivery (COD)' : `💳 ${ord.paymentMethod}`}
+                                    </span>
+
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase border ${
+                                      ord.paymentStatus === 'paid'
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                        : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                    }`}>
+                                      {ord.paymentStatus === 'paid' ? 'Paid' : 'Payment Pending'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 font-mono">
+                                    <span className="text-zinc-400">Grand Total:</span>
+                                    <span className="text-base font-black text-emerald-400">₹{ord.grandTotal}</span>
+                                  </div>
+                                </div>
+
+                                {/* Admin Action Controls */}
+                                <div className="pt-2 border-t border-zinc-800/60 flex flex-wrap items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono font-bold text-zinc-400">Change Status:</span>
+                                    <select
+                                      value={ord.orderStatus}
+                                      onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value as any)}
+                                      className="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl font-bold font-mono text-xs text-blue-400 focus:outline-none focus:border-blue-500"
+                                    >
+                                      <option value="placed">Order Confirmed</option>
+                                      <option value="packing">Packing Items</option>
+                                      <option value="out_for_delivery">Out for Delivery</option>
+                                      <option value="delivered">Delivered</option>
+                                      <option value="cancelled">Cancelled</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {!isCancelled && (
+                                      <button
+                                        onClick={() => handleUpdateOrderStatus(ord.id, 'cancelled')}
+                                        className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold flex items-center gap-1 transition-colors"
+                                      >
+                                        <XCircle className="w-3.5 h-3.5" /> Cancel Order
+                                      </button>
+                                    )}
+
+                                    <button
+                                      onClick={() => {
+                                        setSelectedAdminOrder(ord);
+                                        setIsAdminDetailOpen(true);
+                                      }}
+                                      className="px-3.5 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" /> Full Invoice & Details
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* TAB 4: Delivery Locations & Google Maps Portal */}
                 {activeTab === 'locations' && (

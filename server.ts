@@ -708,11 +708,10 @@ app.post('/api/orders/:id/cancel', (req, res) => {
 
   if (orderIdx !== -1) {
     orders[orderIdx].orderStatus = 'cancelled';
-    deleteOrderFromMongo(req.params.id);
+    saveOrderToMongo(orders[orderIdx]);
     return res.json({ success: true, message: reason || 'Order was cancelled.', order: orders[orderIdx] });
   }
 
-  deleteOrderFromMongo(req.params.id);
   res.json({ success: true, message: reason || 'Order was cancelled.' });
 });
 
@@ -742,12 +741,6 @@ app.put('/api/orders/:id/status', (req, res, next) => {
   const orderIdx = orders.findIndex(o => o.id === req.params.id);
   if (orderIdx === -1) {
     return res.status(404).json({ error: 'Order not found' });
-  }
-
-  if (status === 'cancelled') {
-    const [removedOrder] = orders.splice(orderIdx, 1);
-    deleteOrderFromMongo(req.params.id);
-    return res.json({ ...removedOrder, orderStatus: 'cancelled' });
   }
 
   const order = orders[orderIdx];

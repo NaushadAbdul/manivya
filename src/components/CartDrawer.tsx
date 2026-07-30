@@ -24,6 +24,7 @@ import {
   Sparkles,
   Heart,
   Phone,
+  Mail,
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -50,8 +51,9 @@ export const CartDrawer: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Razorpay' | 'Card' | 'COD'>('UPI');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  // User Mobile Contact Number for delivery rider contact
+  // User Mobile Contact Number & Email for delivery rider & order tracking
   const [contactPhone, setContactPhone] = useState(currentUser?.phone || '7207554777');
+  const [contactEmail, setContactEmail] = useState(currentUser?.email || '');
 
   // Address and Google Maps Location state
   const [selectedAddressData, setSelectedAddressData] = useState({
@@ -78,6 +80,9 @@ export const CartDrawer: React.FC = () => {
   useEffect(() => {
     if (currentUser?.phone) {
       setContactPhone(currentUser.phone);
+    }
+    if (currentUser?.email) {
+      setContactEmail(currentUser.email);
     }
   }, [currentUser]);
 
@@ -156,7 +161,7 @@ export const CartDrawer: React.FC = () => {
         userId: currentUser?.id,
         userName: currentUser?.name || 'Valued Customer',
         userPhone: finalPhone,
-        userEmail: currentUser?.email || '',
+        userEmail: currentUser?.email || contactEmail || 'customer@manivya.com',
         idempotencyKey,
         initialStatus: 'pending',
         items: cart.map(i => ({
@@ -518,6 +523,24 @@ export const CartDrawer: React.FC = () => {
                     className="flex-1 bg-transparent text-xs font-mono font-bold text-white outline-none"
                     maxLength={10}
                     required
+                  />
+                </div>
+              </div>
+
+              {/* Customer Email Input */}
+              <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] font-mono font-bold text-zinc-400 uppercase">
+                  <span>Customer Email Address</span>
+                  <span className="text-blue-400">Updates Admin Dashboard</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 rounded-xl border border-zinc-800 focus-within:border-blue-500">
+                  <Mail className="w-4 h-4 text-blue-400 shrink-0" />
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="customer@example.com"
+                    className="flex-1 bg-transparent text-xs font-mono text-white outline-none"
                   />
                 </div>
               </div>
