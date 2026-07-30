@@ -872,7 +872,7 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
     totalProductsCount: products.length,
     lowStockProductsCount: lowStockCount,
     averageDeliveryTime: 11.4,
-    activeCustomersCount: new Set(orders.map(o => o.userPhone)).size || 120
+    activeCustomersCount: new Set(orders.map(o => o.userPhone)).size
   });
 });
 

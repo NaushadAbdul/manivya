@@ -752,15 +752,14 @@ export const AdminDashboard: React.FC = () => {
                 {activeTab === 'analytics' && (() => {
                   const activeOrders = allOrders.filter(o => o.orderStatus !== 'cancelled');
                   const cancelledOrders = allOrders.filter(o => o.orderStatus === 'cancelled');
-                  const calculatedRevenue = allOrders.length > 0 
-                    ? activeOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0)
-                    : (stats?.totalRevenue ?? 0);
-                  const activeOrdersCount = allOrders.length > 0 ? activeOrders.length : (stats?.todayOrdersCount ?? 0);
+                  const calculatedRevenue = activeOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+                  const activeOrdersCount = activeOrders.length;
                   const cancelledProductsCount = cancelledOrders.reduce(
                     (sum, o) => sum + (o.items || []).reduce((iSum, item) => iSum + (item.quantity || 1), 0),
                     0
                   );
                   const cancelledOrdersCount = cancelledOrders.length;
+                  const lowStockCount = products.filter(p => p.stockCount <= 10).length;
 
                   return (
                     <div className="space-y-4">
@@ -786,7 +785,7 @@ export const AdminDashboard: React.FC = () => {
 
                         <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
                           <p className="text-[10px] font-mono font-bold text-amber-400 uppercase">Low Stock Alert</p>
-                          <p className="text-2xl font-black font-mono text-white">{stats?.lowStockProductsCount || products.filter(p => p.stockCount <= 10).length}</p>
+                          <p className="text-2xl font-black font-mono text-white">{lowStockCount}</p>
                         </div>
                       </div>
                     </div>

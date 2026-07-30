@@ -577,13 +577,13 @@ export const api = {
       return await parseJsonResponse<AdminStats>(res, 'Failed to fetch admin stats');
     } catch (e) {
       return {
-        totalRevenue: 18450,
-        todayOrdersCount: 24,
-        totalProductsCount: 36,
-        lowStockProductsCount: 3,
-        averageDeliveryTime: 12,
-        activeCustomersCount: 182,
-        cancelledOrdersCount: 1,
+        totalRevenue: 0,
+        todayOrdersCount: 0,
+        totalProductsCount: 0,
+        lowStockProductsCount: 0,
+        averageDeliveryTime: 0,
+        activeCustomersCount: 0,
+        cancelledOrdersCount: 0,
         cancelledProductsCount: 0
       };
     }
