@@ -978,6 +978,11 @@ async function startServer() {
     console.warn('⚠️ MongoDB initialization notice:', err);
   }
 
+  // 404 handler for unhandled /api/* routes to prevent Vite middleware from returning HTML or 405 Method Not Allowed
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found.` });
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

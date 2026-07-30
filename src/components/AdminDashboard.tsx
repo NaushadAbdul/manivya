@@ -256,9 +256,9 @@ export const AdminDashboard: React.FC = () => {
     try {
       const s = await api.getAdminStats(adminToken);
       setStats(s);
-      const ords = await api.getOrders();
+      const ords = await api.getOrders(undefined, adminToken);
       setAllOrders(ords);
-      const coups = await api.getCoupons();
+      const coups = await api.getCoupons(adminToken);
       setAllCoupons(coups);
     } catch (err: any) {
       console.error(err);
@@ -456,7 +456,7 @@ export const AdminDashboard: React.FC = () => {
     if (!adminToken) return;
     try {
       await api.updateOrderStatus(orderId, newStatus, adminToken);
-      const ords = await api.getOrders();
+      const ords = await api.getOrders(undefined, adminToken);
       setAllOrders(ords);
       addToast(`Order #${orderId} status changed to ${newStatus}`, 'success');
     } catch (err: any) {

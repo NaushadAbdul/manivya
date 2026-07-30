@@ -23,8 +23,14 @@ async function parseJsonResponse<T = any>(res: Response, fallbackError = 'Reques
     if (res.status === 401 || res.status === 403) {
       throw new Error(`Authentication required (${res.status}). Please log in again.`);
     }
+    if (res.status === 404) {
+      throw new Error(`API endpoint not found (404).`);
+    }
+    if (res.status === 405) {
+      throw new Error(`Method not allowed (405). Route may be misconfigured.`);
+    }
     if (!res.ok) {
-      throw new Error(`Server status ${res.status}: API route unavailable`);
+      throw new Error(`Server status ${res.status}`);
     }
     throw new Error('API returned non-JSON content.');
   }
@@ -159,9 +165,13 @@ export const api = {
   },
 
   // Coupons
-  async getCoupons(): Promise<Coupon[]> {
+  async getCoupons(token?: string): Promise<Coupon[]> {
     try {
-      const res = await fetch('/api/coupons');
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/coupons', { headers });
       return await parseJsonResponse<Coupon[]>(res, 'Failed to fetch coupons');
     } catch (e) {
       const { INITIAL_COUPONS } = await import('../data/initialData');
@@ -182,10 +192,14 @@ export const api = {
   },
 
   // Orders
-  async getOrders(userId?: string): Promise<Order[]> {
+  async getOrders(userId?: string, token?: string): Promise<Order[]> {
     try {
       const url = userId ? `/api/orders?userId=${userId}` : '/api/orders';
-      const res = await fetch(url);
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(url, { headers });
       return await parseJsonResponse<Order[]>(res, 'Failed to fetch orders');
     } catch (e) {
       const { SAMPLE_ORDERS } = await import('../data/initialData');
@@ -402,9 +416,14 @@ export const api = {
     return { success: true };
   },
 
-  async deleteOrder(orderId: string): Promise<boolean> {
+  async deleteOrder(orderId: string, token?: string): Promise<boolean> {
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const res = await fetch(`/api/orders/${orderId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers
     });
     await parseJsonResponse(res, 'Failed to delete order');
     try {
