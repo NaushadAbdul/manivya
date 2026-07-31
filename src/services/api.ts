@@ -23,14 +23,8 @@ async function parseJsonResponse<T = any>(res: Response, fallbackError = 'Reques
     if (res.status === 401 || res.status === 403) {
       throw new Error(`Authentication required (${res.status}). Please log in again.`);
     }
-    if (res.status === 404) {
-      throw new Error(`API endpoint not found (404).`);
-    }
-    if (res.status === 405) {
-      throw new Error(`Method not allowed (405). Route may be misconfigured.`);
-    }
     if (!res.ok) {
-      throw new Error(`Server status ${res.status}`);
+      throw new Error(`${fallbackError} (Server status ${res.status})`);
     }
     throw new Error('API returned non-JSON content.');
   }
@@ -238,10 +232,17 @@ export const api = {
 
       return createdOrder;
     } catch (err: any) {
-      if (err.message && !err.message.includes('Server error') && !err.message.includes('API returned') && !err.message.includes('Failed to fetch')) {
+      if (err.message && (
+        err.message.includes('Cart cannot be empty') ||
+        err.message.includes('Customer name') ||
+        err.message.includes('10-digit mobile') ||
+        err.message.includes('Delivery address') ||
+        err.message.includes('complete delivery address') ||
+        err.message.includes('valid postal pincode')
+      )) {
         throw err;
       }
-      console.warn('/api/orders endpoint unavailable, using client fallback order creation');
+      console.warn('/api/orders endpoint unavailable, using client fallback order creation:', err);
     }
 
     // Client-side fallback order creation (e.g., when API endpoint is unavailable on static deployments like Vercel)
@@ -317,7 +318,11 @@ export const api = {
     return fallbackOrder;
   },
 
-  async confirmOrder(orderId: string, details?: { txnRef?: string; paymentStatus?: string; paymentMethod?: string }): Promise<Order> {
+  async confirmOrder(
+    orderId: string, 
+    details?: { txnRef?: string; paymentStatus?: string; paymentMethod?: string },
+    pendingOrderData?: Partial<Order>
+  ): Promise<Order> {
     try {
       const res = await fetch(`/api/orders/${orderId}/confirm`, {
         method: 'POST',
@@ -348,30 +353,30 @@ export const api = {
 
     const fallbackConfirmed: Order = {
       id: orderId,
-      userId: 'usr-guest',
-      userName: 'Valued Customer',
-      userPhone: '7207554777',
-      userEmail: '',
-      items: [],
-      deliveryAddress: {
+      userId: pendingOrderData?.userId || 'usr-guest',
+      userName: pendingOrderData?.userName || 'Valued Customer',
+      userPhone: pendingOrderData?.userPhone || '7207554777',
+      userEmail: pendingOrderData?.userEmail || '',
+      items: pendingOrderData?.items || [],
+      deliveryAddress: pendingOrderData?.deliveryAddress || {
         id: 'addr-1',
         title: 'Home',
         fullAddress: 'Visakhapatnam',
         area: 'Visakhapatnam',
         pincode: '530026'
       },
-      itemTotal: 0,
-      deliveryFee: 0,
-      handlingFee: 5,
-      discountAmount: 0,
-      grandTotal: 0,
-      paymentMethod: (details?.paymentMethod as any) || 'COD',
-      paymentStatus: (details?.paymentStatus as any) || 'pending',
+      itemTotal: pendingOrderData?.itemTotal || 0,
+      deliveryFee: pendingOrderData?.deliveryFee || 0,
+      handlingFee: pendingOrderData?.handlingFee || 5,
+      discountAmount: pendingOrderData?.discountAmount || 0,
+      grandTotal: pendingOrderData?.grandTotal || 0,
+      paymentMethod: (details?.paymentMethod as any) || pendingOrderData?.paymentMethod || 'COD',
+      paymentStatus: (details?.paymentStatus as any) || (details?.paymentMethod === 'COD' ? 'pending' : 'paid'),
       orderStatus: 'placed',
-      createdAt: new Date().toISOString(),
-      deliveryEtaMinutes: 10,
-      driverName: 'Ramu K. (MANIVYA Rider)',
-      driverPhone: '7207554777'
+      createdAt: pendingOrderData?.createdAt || new Date().toISOString(),
+      deliveryEtaMinutes: pendingOrderData?.deliveryEtaMinutes || 10,
+      driverName: pendingOrderData?.driverName || 'Ramu K. (MANIVYA Rider)',
+      driverPhone: pendingOrderData?.driverPhone || '7207554777'
     };
 
     try {

@@ -188,7 +188,7 @@ export const CartDrawer: React.FC = () => {
         const confirmed = await api.confirmOrder(createdPendingOrder.id, {
           paymentMethod: 'COD',
           paymentStatus: 'pending'
-        });
+        }, createdPendingOrder);
 
         confetti({
           particleCount: 120,
@@ -230,7 +230,7 @@ export const CartDrawer: React.FC = () => {
         txnRef,
         paymentStatus: 'paid',
         paymentMethod: paymentMethod
-      });
+      }, pendingOrder);
 
       confetti({
         particleCount: 120,
