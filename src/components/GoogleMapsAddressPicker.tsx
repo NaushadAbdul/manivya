@@ -95,20 +95,28 @@ export const performReverseGeocode = async (lat: number, lng: number): Promise<{
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
       );
       if (response.ok) {
-        const data = await response.json();
-        const addr = data.address || {};
-        doorNo = addr.house_number || addr.building || addr.door_number || addr.flat || '';
-        street = addr.road || addr.suburb || addr.neighbourhood || addr.residential || addr.pedestrian || addr.city_district || '';
-        city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || 'Visakhapatnam';
-        if (addr.postcode) {
-          const match = addr.postcode.match(/\d{6}/);
-          pincode = match ? match[0] : addr.postcode;
-        }
-        landmark = addr.amenity || addr.shop || addr.building || addr.tourism || addr.historic || '';
+        const text = await response.text();
+        if (text && !text.trim().startsWith('<')) {
+          let data: any = {};
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            console.warn('Invalid JSON from Nominatim:', e);
+          }
+          const addr = data.address || {};
+          doorNo = addr.house_number || addr.building || addr.door_number || addr.flat || '';
+          street = addr.road || addr.suburb || addr.neighbourhood || addr.residential || addr.pedestrian || addr.city_district || '';
+          city = addr.city || addr.town || addr.village || addr.suburb || addr.municipality || 'Visakhapatnam';
+          if (addr.postcode) {
+            const match = addr.postcode.match(/\d{6}/);
+            pincode = match ? match[0] : addr.postcode;
+          }
+          landmark = addr.amenity || addr.shop || addr.building || addr.tourism || addr.historic || '';
 
-        if (!street && data.display_name) {
-          const parts = data.display_name.split(',').map((s: string) => s.trim());
-          street = parts.slice(0, 2).join(', ');
+          if (!street && data.display_name) {
+            const parts = data.display_name.split(',').map((s: string) => s.trim());
+            street = parts.slice(0, 2).join(', ');
+          }
         }
       }
     } catch (err) {

@@ -17,8 +17,9 @@ async function parseJsonResponse<T = any>(res: Response, fallbackError = 'Reques
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
 
-  if (!isJson) {
-    const text = await res.text();
+  const text = await res.text();
+
+  if (!isJson || text.trim().startsWith('<')) {
     console.warn(`[API Response Not JSON] HTTP ${res.status}:`, text.slice(0, 100));
     if (res.status === 401 || res.status === 403) {
       throw new Error(`Authentication required (${res.status}). Please log in again.`);
@@ -26,21 +27,20 @@ async function parseJsonResponse<T = any>(res: Response, fallbackError = 'Reques
     if (!res.ok) {
       throw new Error(`${fallbackError} (Server status ${res.status})`);
     }
-    throw new Error('API returned non-JSON content.');
+    throw new Error(`${fallbackError}: Server returned HTML/non-JSON content.`);
   }
 
+  let data: any;
   try {
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data?.error || data?.message || `${fallbackError} (${res.status})`);
-    }
-    return data;
-  } catch (err: any) {
-    if (err.message && !err.message.includes('Unexpected token') && !err.message.includes('JSON')) {
-      throw err;
-    }
-    throw new Error(fallbackError);
+    data = JSON.parse(text);
+  } catch (err) {
+    throw new Error(`${fallbackError}: Invalid JSON returned by server.`);
   }
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `${fallbackError} (${res.status})`);
+  }
+  return data;
 }
 
 export const api = {
@@ -644,7 +644,14 @@ export const api = {
       }
       const res = await fetch('/api/mongodb/status', { headers });
       if (res.ok) {
-        return await res.json();
+        const text = await res.text();
+        if (text && !text.trim().startsWith('<')) {
+          try {
+            return JSON.parse(text);
+          } catch (jsonErr) {
+            console.warn('Failed to parse MongoDB status JSON:', jsonErr);
+          }
+        }
       }
       return {
         databaseType: 'MongoDB Atlas',
