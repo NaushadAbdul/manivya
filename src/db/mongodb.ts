@@ -198,6 +198,51 @@ export async function saveProductToMongo(product: Product) {
   }
 }
 
+export async function deleteProductFromMongo(productId: string) {
+  if (!isConnected) return;
+  try {
+    await (MongoProductModel as any).deleteOne({ id: productId });
+  } catch (err) {
+    console.warn('⚠️ MongoDB delete product warning:', err);
+  }
+}
+
+export async function saveCategoryToMongo(category: CategoryInfo) {
+  if (!isConnected) return;
+  try {
+    await (MongoCategoryModel as any).findOneAndUpdate({ id: category.id }, category, { upsert: true, new: true });
+  } catch (err) {
+    console.warn('⚠️ MongoDB save category warning:', err);
+  }
+}
+
+export async function deleteCategoryFromMongo(categoryId: string) {
+  if (!isConnected) return;
+  try {
+    await (MongoCategoryModel as any).deleteOne({ id: categoryId });
+  } catch (err) {
+    console.warn('⚠️ MongoDB delete category warning:', err);
+  }
+}
+
+export async function saveCouponToMongo(coupon: Coupon) {
+  if (!isConnected) return;
+  try {
+    await (MongoCouponModel as any).findOneAndUpdate({ code: coupon.code }, coupon, { upsert: true, new: true });
+  } catch (err) {
+    console.warn('⚠️ MongoDB save coupon warning:', err);
+  }
+}
+
+export async function deleteCouponFromMongo(code: string) {
+  if (!isConnected) return;
+  try {
+    await (MongoCouponModel as any).deleteOne({ code: code });
+  } catch (err) {
+    console.warn('⚠️ MongoDB delete coupon warning:', err);
+  }
+}
+
 export async function saveBusinessToMongo(info: BusinessInfo) {
   if (!isConnected) return;
   try {

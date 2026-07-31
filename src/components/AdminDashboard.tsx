@@ -248,6 +248,12 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (adminToken && isVerified) {
       fetchAdminData();
+      fetchMongoStatus();
+      const timer = setInterval(() => {
+        fetchAdminData();
+        fetchMongoStatus();
+      }, 5000);
+      return () => clearInterval(timer);
     }
   }, [adminToken, isVerified]);
 

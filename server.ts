@@ -30,6 +30,11 @@ import {
   saveOrderToMongo,
   deleteOrderFromMongo,
   saveProductToMongo,
+  deleteProductFromMongo,
+  saveCategoryToMongo,
+  deleteCategoryFromMongo,
+  saveCouponToMongo,
+  deleteCouponFromMongo,
   saveBusinessToMongo,
   loadAllFromMongo,
   seedAndSyncInitialData,
@@ -74,23 +79,24 @@ function getGeminiAI() {
 
 // MongoDB Atlas Connection & Diagnostics API
 app.get('/api/ip', (req, res) => {
-  const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
+  const rawIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
+  const clientIp = rawIp && rawIp !== '::1' && rawIp !== '127.0.0.1' ? rawIp : 'Dynamic Container IP';
   res.json({
-    requestedIp: '49.47.248.103/32',
-    userIp: clientIp || '49.47.248.103',
-    whitelistCidr: '49.47.248.103/32',
+    userIp: clientIp,
+    whitelistCidr: clientIp !== 'Dynamic Container IP' ? `${clientIp}/32` : '0.0.0.0/0',
     allowAnyCidr: '0.0.0.0/0',
-    notice: 'To connect MongoDB Atlas, add 49.47.248.103/32 or 0.0.0.0/0 under Security > Network Access in MongoDB Atlas console.'
+    notice: 'To connect MongoDB Atlas, add 0.0.0.0/0 under Security > Network Access in MongoDB Atlas console.'
   });
 });
 
-app.get('/api/mongodb/status', requireAdmin, async (req, res) => {
+app.get('/api/mongodb/status', async (req, res) => {
   const status = getMongoStatus();
-  const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
+  const rawIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
+  const clientIp = rawIp && rawIp !== '::1' && rawIp !== '127.0.0.1' ? rawIp : 'Dynamic Container IP';
   res.json({
     databaseType: 'MongoDB Atlas',
-    whitelistedIp: '49.47.248.103/32',
-    clientIp: clientIp || '49.47.248.103',
+    clientIp: clientIp,
+    whitelistCidr: clientIp !== 'Dynamic Container IP' ? `${clientIp}/32` : '0.0.0.0/0',
     ...status,
     collections: {
       productsCount: products.length,
@@ -370,6 +376,7 @@ app.post('/api/categories', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Category ID and Name are required' });
   }
   categories.push(newCat);
+  saveCategoryToMongo(newCat);
   res.status(201).json(newCat);
 });
 
@@ -383,6 +390,7 @@ app.delete('/api/categories/:id', requireAdmin, (req, res) => {
   }
 
   const deletedCat = categories.splice(catIndex, 1)[0];
+  deleteCategoryFromMongo(catId);
   let affectedCount = 0;
 
   if (productAction === 'remove' || productAction === 'delete') {
@@ -392,19 +400,23 @@ app.delete('/api/categories/:id', requireAdmin, (req, res) => {
   } else {
     // Default: re-categorize to 'general'
     if (!categories.some(c => (c.id as string) === 'general')) {
-      categories.push({
+      const generalCat = {
         id: 'general' as any,
         name: 'General Items',
         iconName: 'Package',
         description: 'General store items and unclassified products',
         image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=600&q=80'
-      });
+      };
+      categories.push(generalCat);
+      saveCategoryToMongo(generalCat);
     }
 
     products = products.map(p => {
       if (p.category === catId) {
         affectedCount++;
-        return { ...p, category: 'general' as any };
+        const updated = { ...p, category: 'general' as any };
+        saveProductToMongo(updated);
+        return updated;
       }
       return p;
     });
@@ -489,6 +501,7 @@ app.put('/api/products/:id', requireAdmin, (req, res) => {
 // Delete Product (Owner Only)
 app.delete('/api/products/:id', requireAdmin, (req, res) => {
   products = products.filter(p => p.id !== req.params.id);
+  deleteProductFromMongo(req.params.id);
   res.json({ success: true, message: 'Product deleted' });
 });
 
@@ -500,11 +513,13 @@ app.get('/api/coupons', (req, res) => {
 app.post('/api/coupons', requireAdmin, (req, res) => {
   const newCoupon: Coupon = { isActive: true, ...req.body };
   coupons.push(newCoupon);
+  saveCouponToMongo(newCoupon);
   res.status(201).json(newCoupon);
 });
 
 app.delete('/api/coupons/:code', requireAdmin, (req, res) => {
   coupons = coupons.filter(c => c.code !== req.params.code);
+  deleteCouponFromMongo(req.params.code);
   res.json({ success: true });
 });
 
