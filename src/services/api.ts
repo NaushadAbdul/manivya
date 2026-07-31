@@ -643,19 +643,29 @@ export const api = {
         headers['Authorization'] = `Bearer ${token}`;
       }
       const res = await fetch('/api/mongodb/status', { headers });
-      return await parseJsonResponse(res, 'Failed to fetch MongoDB status');
-    } catch (e) {
+      if (res.ok) {
+        return await res.json();
+      }
       return {
-        databaseType: 'Local Memory / Client State',
+        databaseType: 'MongoDB Atlas',
         isConnected: false,
         readyState: 0,
-        connectionError: 'Backend server API unavailable or static hosting mode.',
-        uriConfigured: false,
+        connectionError: `Server endpoint status ${res.status}`,
+        uriConfigured: true,
+        collections: { productsCount: 0, ordersCount: 0, categoriesCount: 0, couponsCount: 0 }
+      };
+    } catch (e: any) {
+      return {
+        databaseType: 'MongoDB Atlas',
+        isConnected: false,
+        readyState: 0,
+        connectionError: e?.message || 'Unable to reach backend status endpoint',
+        uriConfigured: true,
         collections: {
-          productsCount: 36,
-          ordersCount: 12,
-          categoriesCount: 8,
-          couponsCount: 4
+          productsCount: 0,
+          ordersCount: 0,
+          categoriesCount: 0,
+          couponsCount: 0
         }
       };
     }

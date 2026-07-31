@@ -2026,35 +2026,36 @@ export const AdminDashboard: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="font-mono font-bold text-blue-400 flex items-center gap-1.5 uppercase text-[11px]">
                             <HardDrive className="w-4 h-4 text-blue-400" />
-                            MongoDB Atlas Network Access IP Address
+                            MongoDB Atlas Network Access Configuration
                           </span>
                           <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] font-bold">
-                            Whitelisted IP
+                            Dynamic Container IP
                           </span>
                         </div>
 
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 bg-black/60 rounded-lg border border-zinc-800 font-mono">
                           <div>
-                            <p className="text-[10px] text-zinc-400 uppercase">IP Address to Add in MongoDB Atlas:</p>
+                            <p className="text-[10px] text-zinc-400 uppercase">IP Whitelist Rule for Atlas Console:</p>
                             <p className="text-sm font-extrabold text-emerald-400 select-all tracking-wider">
-                              49.47.248.103/32
+                              {mongoStatus?.whitelistCidr || mongoStatus?.allowAnyCidr || '0.0.0.0/0'}
                             </p>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard.writeText('49.47.248.103/32');
-                              addToast('Copied IP 49.47.248.103/32 to clipboard!', 'success');
+                              const cidr = mongoStatus?.whitelistCidr || mongoStatus?.allowAnyCidr || '0.0.0.0/0';
+                              navigator.clipboard.writeText(cidr);
+                              addToast(`Copied ${cidr} to clipboard!`, 'success');
                             }}
                             className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg font-mono text-[10px] font-bold transition-all shrink-0"
                           >
-                            📋 Copy IP Address
+                            📋 Copy Whitelist Rule
                           </button>
                         </div>
 
                         <p className="text-[11px] text-zinc-300 leading-snug font-sans">
-                          Add <code className="bg-zinc-800 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">49.47.248.103/32</code> under <strong className="text-white">Security &gt; Network Access &gt; + Add IP Address</strong> in your MongoDB Atlas console to allow database connections.
+                          In your MongoDB Atlas console, navigate to <strong className="text-white">Security &gt; Network Access &gt; + Add IP Address</strong> and add <code className="bg-zinc-800 text-emerald-300 px-1 py-0.5 rounded font-mono font-bold">{mongoStatus?.allowAnyCidr || '0.0.0.0/0'}</code> (Allow Access from Anywhere) to permit dynamic Cloud Run container traffic.
                         </p>
                       </div>
 
