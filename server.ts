@@ -9,6 +9,9 @@ dotenv.config();
 if (!process.env.MONGODB_URI && fs.existsSync('.env.example')) {
   dotenv.config({ path: '.env.example' });
 }
+if (!process.env.MONGODB_URI || process.env.MONGODB_URI.includes('<') || process.env.MONGODB_URI.includes('>')) {
+  process.env.MONGODB_URI = "mongodb+srv://dekuofficiaal734_db_user:UXzZLVLUihLsITID@cluster0.qkabanh.mongodb.net/?appName=Cluster0";
+}
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import {

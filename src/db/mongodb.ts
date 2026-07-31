@@ -102,27 +102,24 @@ export const MongoCategoryModel = mongoose.models.Category || mongoose.model('Ca
 export const MongoCouponModel = mongoose.models.Coupon || mongoose.model('Coupon', CouponSchema);
 export const MongoBusinessModel = mongoose.models.BusinessInfo || mongoose.model('BusinessInfo', BusinessInfoSchema);
 
+const DEFAULT_MONGO_URI = 'mongodb+srv://dekuofficiaal734_db_user:UXzZLVLUihLsITID@cluster0.qkabanh.mongodb.net/?appName=Cluster0';
+
 let isConnected = false;
 let connectionError: string | null = null;
 
 export async function initMongoDBAtlas() {
-  const uri = process.env.MONGODB_URI;
+  let uri = process.env.MONGODB_URI;
 
   const isPlaceholder = !uri || 
     uri.includes('username:password') || 
     uri.includes('example.mongodb.net') || 
-    uri.includes('<username>') || 
-    uri.includes('<password>') || 
+    uri.includes('<') || 
+    uri.includes('>') || 
     uri.length < 15;
 
   if (isPlaceholder) {
-    console.log('ℹ️ MongoDB Atlas: MONGODB_URI is not configured or is using default placeholder. Running in high-performance in-memory mode.');
-    isConnected = false;
-    connectionError = 'MONGODB_URI not configured. Please enter your MongoDB Atlas URI in Admin Dashboard or environment variables.';
-    return {
-      connected: false,
-      reason: connectionError
-    };
+    uri = DEFAULT_MONGO_URI;
+    process.env.MONGODB_URI = DEFAULT_MONGO_URI;
   }
 
   try {
@@ -158,12 +155,12 @@ export async function initMongoDBAtlas() {
 }
 
 export function getMongoStatus() {
-  const uri = process.env.MONGODB_URI;
+  const uri = process.env.MONGODB_URI || DEFAULT_MONGO_URI;
   const isPlaceholder = !uri || 
     uri.includes('username:password') || 
     uri.includes('example.mongodb.net') || 
-    uri.includes('<username>') || 
-    uri.includes('<password>') || 
+    uri.includes('<') || 
+    uri.includes('>') || 
     uri.length < 15;
 
   return {
