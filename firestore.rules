@@ -1,17 +1,30 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /cart/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /orders/{orderId} {
+      allow create: if true; // Allows order placement
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email);
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || request.auth.token.email != null);
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
   }
 }
-
-
-
-
-
-
-
-
