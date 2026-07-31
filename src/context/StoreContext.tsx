@@ -252,16 +252,53 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
-  // Load initial data
+  // Load initial data & Real-time Catalog Polling
+  const knownProductsCountRef = useRef<number | null>(null);
+
   useEffect(() => {
-    refreshProducts();
-    refreshCategories();
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const pollStoreCatalogData = async () => {
+      try {
+        const [latestProducts, latestCategories] = await Promise.all([
+          api.getProducts(),
+          api.getCategories()
+        ]);
+
+        // Detect if admin added new products live on another device
+        if (knownProductsCountRef.current !== null && latestProducts.length > knownProductsCountRef.current) {
+          const diff = latestProducts.length - knownProductsCountRef.current;
+          addToast(`✨ Store Updated: ${diff} new product${diff > 1 ? 's' : ''} added to catalog!`, 'info');
+        }
+        knownProductsCountRef.current = latestProducts.length;
+
+        setProducts(latestProducts);
+        setCategories(latestCategories);
+      } catch (err) {
+        // silent error catch in background
+      }
+    };
+
+    pollStoreCatalogData();
+    intervalId = setInterval(pollStoreCatalogData, 3000);
+
+    const handleFocus = () => {
+      pollStoreCatalogData();
+    };
+    window.addEventListener('focus', handleFocus);
+
     api.getBusinessInfo().then(setBusinessInfo).catch(console.error);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const refreshProducts = async () => {
     try {
       const items = await api.getProducts();
+      knownProductsCountRef.current = items.length;
       setProducts(items);
     } catch (e) {
       console.error(e);
