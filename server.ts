@@ -14,7 +14,6 @@ if (!process.env.MONGODB_URI || process.env.MONGODB_URI.includes('<') || process
 }
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import admin from 'firebase-admin';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import {
@@ -51,19 +50,7 @@ import {
   MongoUserModel
 } from './src/db/mongodb.js';
 
-// Initialize Firebase Admin SDK
-const fbAdmin: any = (admin as any).default || admin;
-
-if (!fbAdmin.apps || !fbAdmin.apps.length) {
-  try {
-    fbAdmin.initializeApp({
-      projectId: 'manojavam-multi-enterprises'
-    });
-    console.log('🔥 Firebase Admin initialized for project manojavam-multi-enterprises');
-  } catch (err) {
-    console.warn('⚠️ Firebase Admin init warning:', err);
-  }
-}
+// Native MongoDB Atlas & Custom JWT Token Authentication
 
 const JWT_SECRET = process.env.JWT_SECRET || 'manivya-express-jwt-secret-key-2026-production';
 
@@ -177,27 +164,12 @@ async function verifyToken(req: any, res: any, next: any) {
     return next();
   }
 
-  // Attempt Firebase ID Token verification
   try {
-    const decoded = await fbAdmin.auth().verifyIdToken(token);
-    const dbUser = await findUserByUidInMongo(decoded.uid) || await findUserByEmailInMongo(decoded.email || '');
-    req.user = {
-      id: decoded.uid,
-      uid: decoded.uid,
-      email: decoded.email || dbUser?.email || '',
-      name: decoded.name || dbUser?.name || 'User',
-      role: dbUser?.role || (decoded.email === 'admin@manivya.com' ? 'admin' : 'customer')
-    };
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    req.user = decoded;
     return next();
-  } catch (fbErr) {
-    // Fallback to custom JWT token
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      req.user = decoded;
-      return next();
-    } catch (jwtErr) {
-      return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
-    }
+  } catch (jwtErr) {
+    return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
   }
 }
 
@@ -212,45 +184,18 @@ function requireAdmin(req: any, res: any, next: any) {
 
 // Authentication API Endpoints
 
-// Firebase Authentication Endpoint (Google Sign-In & Email/Password Sync)
-app.post('/api/auth/firebase-login', async (req, res) => {
+// Direct Customer / Guest Profile Sync Endpoint
+app.post(['/api/auth/firebase-login', '/api/auth/sync-user'], async (req, res) => {
   const { idToken, userDetails } = req.body;
   const rawIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
   const clientIp = rawIp && rawIp !== '::1' && rawIp !== '127.0.0.1' ? rawIp : 'Cloud Run Ingress IP';
   const userAgent = req.headers['user-agent'] || '';
 
-  let verifiedUid = '';
-  let verifiedEmail = '';
-  let verifiedName = '';
-  let verifiedPhoto = '';
-  let provider = userDetails?.provider || 'firebase';
-
-  if (idToken) {
-    try {
-      const decoded = await fbAdmin.auth().verifyIdToken(idToken);
-      verifiedUid = decoded.uid;
-      verifiedEmail = decoded.email || userDetails?.email || '';
-      verifiedName = decoded.name || userDetails?.name || verifiedEmail.split('@')[0] || 'Customer';
-      verifiedPhoto = decoded.picture || userDetails?.photo || '';
-      provider = decoded.firebase?.sign_in_provider || provider;
-    } catch (err) {
-      if (userDetails?.uid && userDetails?.email) {
-        verifiedUid = userDetails.uid;
-        verifiedEmail = userDetails.email;
-        verifiedName = userDetails.name || verifiedEmail.split('@')[0];
-        verifiedPhoto = userDetails.photo || '';
-      } else {
-        return res.status(401).json({ error: 'Invalid or expired Firebase ID token.' });
-      }
-    }
-  } else if (userDetails?.uid && userDetails?.email) {
-    verifiedUid = userDetails.uid;
-    verifiedEmail = userDetails.email;
-    verifiedName = userDetails.name || verifiedEmail.split('@')[0];
-    verifiedPhoto = userDetails.photo || '';
-  } else {
-    return res.status(400).json({ error: 'Firebase ID token or user details required.' });
-  }
+  const verifiedUid = userDetails?.uid || userDetails?.id || `usr-${Date.now()}`;
+  const verifiedEmail = (userDetails?.email || '').toLowerCase().trim();
+  const verifiedName = userDetails?.name || (verifiedEmail ? verifiedEmail.split('@')[0] : 'Customer');
+  const verifiedPhoto = userDetails?.photo || '';
+  const provider = userDetails?.provider || 'mongodb_atlas';
 
   // Parse OS & Browser for Login Activity Audit
   let browser = 'Chrome/Browser';

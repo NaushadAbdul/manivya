@@ -1,17 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
-  auth, 
-  googleProvider, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  signOut as firebaseSignOut, 
-  onAuthStateChanged,
   db,
   doc,
   getDoc,
   setDoc,
-  diagnoseFirebaseAuthError,
   formatNameFromEmail
 } from '../lib/firebase';
 import { 
@@ -87,7 +79,6 @@ interface StoreContextType {
 
   // Auth & Admin
   loginUser: (user: User) => void;
-  loginWithGoogle: () => Promise<void>;
   logoutUser: () => void;
   updateUserAddress: (newAddress: { fullAddress: string; area: string; pincode: string; title?: string }) => void;
   updateUserProfile: (updatedFields: { name?: string; email?: string; phone?: string }) => void;
@@ -203,9 +194,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         localStorage.setItem('manivya_user', JSON.stringify(updatedUser));
       } catch (e) {
         console.error(e);
-      }
-      if (auth.currentUser) {
-        setDoc(doc(db, 'users', auth.currentUser.uid), { addresses: updatedAddresses }, { merge: true }).catch(() => {});
       }
       return updatedUser;
     });
@@ -415,85 +403,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isWishlisted = (productId: string) => wishlist.includes(productId);
 
-  // Listen for Google Sign-In redirect result (e.g. on mobile browsers after redirect)
+  // User Session Initialization & MongoDB Profile Sync
   useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          const user = result.user;
-          addToast(`Google Sign-In successful! Welcome, ${user.displayName || 'Customer'}! 🎉`, 'success');
-          setIsAuthModalOpen(false);
-        }
-      })
-      .catch((err) => {
-        if (err) {
-          const diag = diagnoseFirebaseAuthError(err);
-          if (diag.category === 'CONFIGURATION_MISMATCH') {
-            const currentDomain = diag.domain || (typeof window !== 'undefined' ? window.location.hostname : 'this host');
-            addToast(`Domain unauthorized: Please add "${currentDomain}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.`, 'error');
-          } else if (diag.category === 'NETWORK_FAILURE') {
-            addToast('Network connection issue completing Google Sign-In.', 'error');
-          } else if (diag.category !== 'USER_CANCELLED') {
-            addToast(diag.message || 'Google redirect sign-in failed.', 'error');
-          }
-        }
-      });
-  }, []);
-
-  // Firebase Auth State Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        try {
-          const idToken = await fbUser.getIdToken();
-          const userDetails = {
-            uid: fbUser.uid,
-            name: fbUser.displayName || (fbUser.email ? formatNameFromEmail(fbUser.email) : 'Customer'),
-            email: fbUser.email || '',
-            photo: fbUser.photoURL || '',
-            phone: fbUser.phoneNumber || '',
-            provider: fbUser.providerData?.[0]?.providerId || 'firebase',
-            emailVerified: fbUser.emailVerified
-          };
-
-          // Sync user profile & login activity with MongoDB Atlas
-          const syncRes = await api.firebaseLogin(idToken, userDetails);
-          const appUser = syncRes.user;
-
-          // Also mirror to Firestore user document
-          try {
-            const userDocRef = doc(db, 'users', fbUser.uid);
-            await setDoc(userDocRef, {
-              userId: fbUser.uid,
-              displayName: appUser.name,
-              email: appUser.email,
-              photoURL: appUser.photo || '',
-              phone: appUser.phone || '',
-              role: appUser.role || 'customer',
-              addresses: appUser.addresses || [],
-              emailVerified: fbUser.emailVerified,
-              lastLogin: new Date().toISOString()
-            }, { merge: true });
-          } catch (e) {
-            // silent Firestore write fallback
-          }
-
-          setCurrentUser(appUser);
-          localStorage.setItem('manivya_user', JSON.stringify(appUser));
-          if (syncRes.token) {
-            localStorage.setItem('manivya_auth_token', syncRes.token);
-          }
-        } catch (err) {
-          console.error('Firebase Auth listener error:', err);
-        }
-      } else {
-        setCurrentUser(null);
+    const storedUserStr = localStorage.getItem('manivya_user');
+    if (storedUserStr) {
+      try {
+        const parsed = JSON.parse(storedUserStr);
+        setCurrentUser(parsed);
+      } catch (e) {
         localStorage.removeItem('manivya_user');
-        localStorage.removeItem('manivya_auth_token');
       }
-    });
-    return () => unsubscribe();
-  }, [selectedLocation]);
+    }
+  }, []);
 
   // Auth Operations
   const loginUser = (user: User) => {
@@ -520,9 +441,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (e) {
         console.error(e);
       }
-      if (auth.currentUser) {
-        setDoc(doc(db, 'users', auth.currentUser.uid), { addresses: updatedAddresses }, { merge: true }).catch(() => {});
-      }
       return updatedUser;
     });
     addToast(`Delivery address updated according to location: ${newAddr.area || newAddr.pincode}`, 'success');
@@ -537,97 +455,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (e) {
         console.error(e);
       }
-      if (auth.currentUser) {
-        setDoc(doc(db, 'users', auth.currentUser.uid), updatedFields, { merge: true }).catch(() => {});
-      }
       return updatedUser;
     });
     addToast('Profile updated successfully! 🎉', 'success');
-  };
-
-  const isSigningInRef = useRef(false);
-
-  const loginWithGoogle = async () => {
-    if (isSigningInRef.current) {
-      console.warn('Google Sign-In is already in progress.');
-      return;
-    }
-    isSigningInRef.current = true;
-
-    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    try {
-      if (isMobile) {
-        // Mobile / Mobile Webview: execute official Firebase redirect flow
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
-
-      // Desktop: attempt signInWithPopup first
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-        const userEmail = user.email || '';
-        const userName = user.displayName || (userEmail ? formatNameFromEmail(userEmail) : 'Google User');
-
-        const loggedUser: User = {
-          id: user.uid,
-          name: userName,
-          email: userEmail,
-          phone: user.phoneNumber || '',
-          role: 'customer',
-          addresses: currentUser?.addresses || [
-            {
-              id: `addr-${Date.now()}`,
-              title: 'Home',
-              fullAddress: `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
-              area: selectedLocation.area,
-              pincode: selectedLocation.pincode,
-              isDefault: true
-            }
-          ],
-          createdAt: new Date().toISOString()
-        };
-        loginUser(loggedUser);
-        addToast(`Google Sign-In successful! Welcome, ${loggedUser.name}! 🎉`, 'success');
-        setIsAuthModalOpen(false);
-      } catch (popupErr: any) {
-        const diag = diagnoseFirebaseAuthError(popupErr);
-        if (
-          diag.category === 'POPUP_OR_ENVIRONMENT' || 
-          popupErr?.code === 'auth/popup-blocked' || 
-          popupErr?.code === 'auth/operation-not-supported-in-this-environment'
-        ) {
-          console.warn('Popup blocked/unsupported. Falling back to signInWithRedirect...');
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        }
-        throw popupErr;
-      }
-    } catch (err: any) {
-      const diag = diagnoseFirebaseAuthError(err);
-      if (diag.category === 'CONFIGURATION_MISMATCH') {
-        const currentDomain = diag.domain || (typeof window !== 'undefined' ? window.location.hostname : 'this host');
-        addToast(`Domain unauthorized: Please add "${currentDomain}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.`, 'error');
-      } else if (diag.category === 'NETWORK_FAILURE') {
-        addToast('Network connection issue during Google Sign-In. Please check your connectivity.', 'error');
-      } else if (diag.category === 'USER_CANCELLED') {
-        console.info('Sign-In window closed by user.');
-      } else {
-        addToast(diag.message || 'Failed to sign in with Google.', 'error');
-      }
-    } finally {
-      setTimeout(() => {
-        isSigningInRef.current = false;
-      }, 1000);
-    }
   };
 
   const logoutUser = () => {
     if (currentUser?.uid || currentUser?.id) {
       api.recordLogout(currentUser.uid || currentUser.id).catch(() => {});
     }
-    firebaseSignOut(auth).catch(() => {});
     setCurrentUser(null);
     localStorage.removeItem('manivya_user');
     localStorage.removeItem('manivya_auth_token');
@@ -697,7 +533,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isWishlisted,
 
         loginUser,
-        loginWithGoogle,
         logoutUser,
         updateUserAddress,
         updateUserProfile,

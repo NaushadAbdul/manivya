@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { auth, googleProvider, signInWithPopup } from '../lib/firebase';
 import { ManivyaLogo } from './ManivyaLogo';
 import { OrderDetailModal } from './OrderDetailModal';
 import { api } from '../services/api';

@@ -188,10 +188,12 @@ export function getMongoStatus() {
     uri.includes('>') || 
     uri.length < 15;
 
+  const connectedNow = mongoose.connection.readyState === 1;
+
   return {
-    isConnected,
+    isConnected: connectedNow || isConnected,
     readyState: mongoose.connection.readyState,
-    connectionError,
+    connectionError: connectedNow ? null : connectionError,
     uriConfigured: !isPlaceholder
   };
 }

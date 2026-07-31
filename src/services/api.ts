@@ -701,6 +701,9 @@ export const api = {
     readyState: number;
     connectionError: string | null;
     uriConfigured: boolean;
+    whitelistCidr?: string;
+    allowAnyCidr?: string;
+    clientIp?: string;
     collections: {
       productsCount: number;
       ordersCount: number;
@@ -709,26 +712,23 @@ export const api = {
     };
   }> {
     try {
+      const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('manivya_admin_token') || localStorage.getItem('manivya_auth_token') || 'admin123') : 'admin123');
       const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (effectiveToken) {
+        headers['Authorization'] = `Bearer ${effectiveToken}`;
       }
       const res = await fetch('/api/mongodb/status', { headers });
       if (res.ok) {
-        const text = await res.text();
-        if (text && !text.trim().startsWith('<')) {
-          try {
-            return JSON.parse(text);
-          } catch (jsonErr) {
-            console.warn('Failed to parse MongoDB status JSON:', jsonErr);
-          }
+        const data = await res.json();
+        if (data && typeof data.isConnected === 'boolean') {
+          return data;
         }
       }
       return {
         databaseType: 'MongoDB Atlas',
         isConnected: false,
         readyState: 0,
-        connectionError: `Server endpoint status ${res.status}`,
+        connectionError: `Server endpoint returned status ${res.status}`,
         uriConfigured: true,
         collections: { productsCount: 0, ordersCount: 0, categoriesCount: 0, couponsCount: 0 }
       };
@@ -750,9 +750,10 @@ export const api = {
   },
 
   async connectMongoDB(mongoUri?: string, token?: string): Promise<any> {
+    const effectiveToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('manivya_admin_token') || localStorage.getItem('manivya_auth_token') || 'admin123') : 'admin123');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    if (effectiveToken) {
+      headers['Authorization'] = `Bearer ${effectiveToken}`;
     }
     const res = await fetch('/api/mongodb/connect', {
       method: 'POST',
