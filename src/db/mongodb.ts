@@ -4,14 +4,38 @@ import { Product, Order, CategoryInfo, Coupon, BusinessInfo } from '../types';
 
 // Mongoose Schemas for MongoDB Atlas
 const UserSchema = new Schema({
-  id: { type: String, required: true, unique: true },
+  id: { type: String, required: true },
+  uid: { type: String },
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, required: true },
+  email: { type: String, required: true, lowercase: true, trim: true },
+  password: { type: String, required: false },
+  photo: { type: String },
+  provider: { type: String },
   phone: { type: String },
-  role: { type: String, enum: ['admin', 'customer'], default: 'customer' },
+  role: { type: String, enum: ['admin', 'customer', 'owner'], default: 'customer' },
   addresses: Array,
+  wishlist: Array,
+  cart: Array,
+  lastLogin: { type: String },
+  loginCount: { type: Number, default: 1 },
+  status: { type: String, default: 'active' },
+  emailVerified: { type: Boolean, default: false },
   createdAt: { type: String, required: true }
+}, { timestamps: true });
+
+const LoginActivitySchema = new Schema({
+  id: { type: String, required: true, unique: true },
+  uid: { type: String, required: true },
+  name: { type: String },
+  email: { type: String },
+  provider: { type: String },
+  loginTime: { type: String, required: true },
+  logoutTime: { type: String },
+  ip: { type: String },
+  userAgent: { type: String },
+  browser: { type: String },
+  os: { type: String },
+  device: { type: String }
 }, { timestamps: true });
 
 const ProductSchema = new Schema({
@@ -96,6 +120,7 @@ const BusinessInfoSchema = new Schema({
 }, { timestamps: true });
 
 export const MongoUserModel = mongoose.models.User || mongoose.model('User', UserSchema);
+export const MongoLoginActivityModel = mongoose.models.LoginActivity || mongoose.model('LoginActivity', LoginActivitySchema);
 export const MongoProductModel = mongoose.models.Product || mongoose.model('Product', ProductSchema);
 export const MongoOrderModel = mongoose.models.Order || mongoose.model('Order', OrderSchema);
 export const MongoCategoryModel = mongoose.models.Category || mongoose.model('Category', CategorySchema);
@@ -344,6 +369,16 @@ export async function findUserByEmailInMongo(email: string) {
   }
 }
 
+export async function findUserByUidInMongo(uid: string) {
+  if (!isConnected) return null;
+  try {
+    return await (MongoUserModel as any).findOne({ $or: [{ uid: uid }, { id: uid }] }).lean();
+  } catch (err) {
+    console.warn('⚠️ MongoDB findUserByUid error:', err);
+    return null;
+  }
+}
+
 export async function createUserInMongo(userData: any) {
   if (!isConnected) return null;
   try {
@@ -351,6 +386,126 @@ export async function createUserInMongo(userData: any) {
   } catch (err) {
     console.warn('⚠️ MongoDB createUser error:', err);
     return null;
+  }
+}
+
+export async function upsertFirebaseUserInMongo(fbUser: {
+  uid: string;
+  email: string;
+  name?: string;
+  photo?: string;
+  provider?: string;
+  phone?: string;
+  role?: string;
+  addresses?: any[];
+}) {
+  if (!isConnected) return null;
+  try {
+    const cleanEmail = fbUser.email.toLowerCase().trim();
+    const existing = await (MongoUserModel as any).findOne({
+      $or: [{ uid: fbUser.uid }, { email: cleanEmail }]
+    });
+
+    const now = new Date().toISOString();
+    // Known admin emails
+    const isAdmin = cleanEmail === 'admin@manivya.com' || cleanEmail === 'dekuofficiaal734@gmail.com';
+    const assignedRole = fbUser.role || (isAdmin ? 'admin' : (existing?.role || 'customer'));
+
+    if (existing) {
+      existing.uid = fbUser.uid;
+      existing.name = fbUser.name || existing.name || cleanEmail.split('@')[0];
+      existing.email = cleanEmail;
+      if (fbUser.photo) existing.photo = fbUser.photo;
+      if (fbUser.provider) existing.provider = fbUser.provider;
+      if (fbUser.phone) existing.phone = fbUser.phone;
+      existing.role = assignedRole;
+      existing.lastLogin = now;
+      existing.loginCount = (existing.loginCount || 1) + 1;
+      existing.status = 'active';
+      await existing.save();
+      return existing.toObject();
+    } else {
+      const newUser = await (MongoUserModel as any).create({
+        id: fbUser.uid,
+        uid: fbUser.uid,
+        name: fbUser.name || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        photo: fbUser.photo || '',
+        provider: fbUser.provider || 'password',
+        phone: fbUser.phone || '',
+        role: assignedRole,
+        addresses: fbUser.addresses || [],
+        createdAt: now,
+        lastLogin: now,
+        loginCount: 1,
+        status: 'active'
+      });
+      return newUser.toObject();
+    }
+  } catch (err) {
+    console.warn('⚠️ MongoDB upsertFirebaseUser warning:', err);
+    return null;
+  }
+}
+
+export async function recordLoginActivityInMongo(activity: {
+  uid: string;
+  name?: string;
+  email?: string;
+  provider?: string;
+  ip?: string;
+  userAgent?: string;
+  browser?: string;
+  os?: string;
+  device?: string;
+}) {
+  if (!isConnected) return null;
+  try {
+    const activityRecord = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      uid: activity.uid,
+      name: activity.name || '',
+      email: activity.email || '',
+      provider: activity.provider || 'firebase',
+      loginTime: new Date().toISOString(),
+      ip: activity.ip || 'Unknown',
+      userAgent: activity.userAgent || '',
+      browser: activity.browser || 'Unknown Browser',
+      os: activity.os || 'Unknown OS',
+      device: activity.device || 'Desktop/Mobile'
+    };
+    return await (MongoLoginActivityModel as any).create(activityRecord);
+  } catch (err) {
+    console.warn('⚠️ MongoDB recordLoginActivity warning:', err);
+    return null;
+  }
+}
+
+export async function updateLogoutTimeInMongo(uid: string) {
+  if (!isConnected) return;
+  try {
+    const now = new Date().toISOString();
+    await (MongoLoginActivityModel as any).findOneAndUpdate(
+      { uid: uid, logoutTime: { $exists: false } },
+      { logoutTime: now },
+      { sort: { createdAt: -1 } }
+    );
+  } catch (err) {
+    console.warn('⚠️ MongoDB updateLogoutTime warning:', err);
+  }
+}
+
+export async function getLoginActivitiesFromMongo(limit = 50) {
+  if (!isConnected) return [];
+  try {
+    return await (MongoLoginActivityModel as any)
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+  } catch (err) {
+    console.warn('⚠️ MongoDB getLoginActivities warning:', err);
+    return [];
   }
 }
 

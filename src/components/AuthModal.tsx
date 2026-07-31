@@ -2,14 +2,29 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { User } from '../types';
 import { api } from '../services/api';
-import { X, User as UserIcon, Lock, Phone, MapPin, CheckCircle2, LogOut, KeyRound, Sparkles } from 'lucide-react';
+import { 
+  auth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail, 
+  sendEmailVerification, 
+  updateProfile 
+} from '../lib/firebase';
+import { 
+  X, 
+  User as UserIcon, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  CheckCircle2, 
+  LogOut, 
+  KeyRound, 
+  AlertCircle, 
+  Send, 
+  ShieldCheck, 
+  ArrowLeft 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface StoredAccount {
-  username: string;
-  password: string;
-  user: User;
-}
 
 export const AuthModal: React.FC = () => {
   const { 
@@ -25,8 +40,12 @@ export const AuthModal: React.FC = () => {
     setIsLocationModalOpen,
     addToast 
   } = useStore();
-  const [isSignup, setIsSignup] = useState(false);
-  
+
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot_password'>('login');
+  const [loading, setLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+
   // Profile editing
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editName, setEditName] = useState('');
@@ -39,204 +58,173 @@ export const AuthModal: React.FC = () => {
   const [customArea, setCustomArea] = useState('');
   const [customPincode, setCustomPincode] = useState('');
 
-  // Login fields
-  const [username, setUsername] = useState('');
+  // Input fields
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // Additional Register fields
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('530026');
-
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
       await loginWithGoogle();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Google Sign In Error:', e);
     } finally {
       setIsGoogleLoading(false);
     }
   };
 
-  if (!isAuthModalOpen) return null;
-
-  // Helper to load accounts from localStorage
-  const getStoredAccounts = (): StoredAccount[] => {
-    try {
-      const saved = localStorage.getItem('manivya_accounts');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      addToast('Please enter a valid email address.', 'error');
+      return;
     }
-    // Default seed account
-    return [
-      {
-        username: 'naushad',
-        password: 'user123',
-        user: {
-          id: 'usr-naushad',
-          name: 'Naushad Abdul',
-          email: 'naushad@manivya.com',
-          phone: '7207554777',
-          role: 'customer',
-          addresses: [
-            {
-              id: 'addr-naushad',
-              title: 'Home',
-              fullAddress: '25-1-13, Gajuwaka Bypass Road, Durgavanipalem, Pedagantyada',
-              area: 'Gajuwaka Bypass Road',
-              pincode: '530026',
-              isDefault: true
-            }
-          ],
-          createdAt: new Date().toISOString()
-        }
-      },
-      {
-        username: 'kalyan',
-        password: 'user123',
-        user: {
-          id: 'usr-kalyan',
-          name: 'Kalyan Varma',
-          email: 'kalyan@manivya.com',
-          phone: '9848022338',
-          role: 'customer',
-          addresses: [
-            {
-              id: 'addr-kalyan',
-              title: 'Office',
-              fullAddress: 'VIP Road, Siripuram, Visakhapatnam',
-              area: 'Siripuram',
-              pincode: '530003',
-              isDefault: true
-            }
-          ],
-          createdAt: new Date().toISOString()
-        }
+
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      addToast(`Password reset link sent to ${cleanEmail}! Please check your email inbox. 📧`, 'success');
+      setMode('login');
+    } catch (err: any) {
+      let msg = err.message || 'Failed to send password reset email.';
+      if (err.code === 'auth/user-not-found') {
+        msg = 'No account found with this email address.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'Invalid email address format.';
       }
-    ];
+      addToast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendEmailVerification = async () => {
+    if (!auth.currentUser) return;
+    setIsResendingVerification(true);
+    try {
+      await sendEmailVerification(auth.currentUser);
+      addToast(`Verification email resent to ${auth.currentUser.email}! 📧`, 'success');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to resend email verification.', 'error');
+    } finally {
+      setIsResendingVerification(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanUsername || !password) {
-      addToast('Please enter both username/email and password', 'error');
+    if (!cleanEmail || !password) {
+      addToast('Please enter email address and password', 'error');
       return;
     }
 
-    if (isSignup) {
-      try {
-        const userEmail = email.trim() || (cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@manivya.com`);
-        const res = await api.userRegister({
-          name: name.trim() || cleanUsername,
-          email: userEmail,
-          password: password,
-          phone: phone.trim() || '7207554777'
-        });
+    setLoading(true);
 
-        const registeredUser: User = {
-          ...res.user,
+    if (mode === 'signup') {
+      // 1. Firebase Email/Password Registration
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        const fbUser = userCred.user;
+
+        // Update display name
+        const displayName = name.trim() || cleanEmail.split('@')[0];
+        await updateProfile(fbUser, { displayName });
+
+        // Send Email Verification
+        try {
+          await sendEmailVerification(fbUser);
+          addToast(`Account created! Email verification link sent to ${cleanEmail} 📧`, 'info');
+        } catch (vErr) {
+          console.warn('Email verification send warning:', vErr);
+        }
+
+        // Generate ID Token
+        const idToken = await fbUser.getIdToken();
+
+        // Sync with MongoDB Atlas backend
+        const syncRes = await api.firebaseLogin(idToken, {
+          uid: fbUser.uid,
+          name: displayName,
+          email: cleanEmail,
+          phone: phone.trim() || '7207554777',
+          provider: 'password',
           addresses: [
             {
               id: `addr-${Date.now()}`,
               title: 'Home',
-              fullAddress: address.trim() || '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-              area: 'Visakhapatnam',
+              fullAddress: address.trim() ? `${address.trim()}, Visakhapatnam - ${pincode}` : `${selectedLocation.area}, Visakhapatnam - ${pincode}`,
+              area: selectedLocation.area || 'Visakhapatnam',
               pincode: pincode.trim() || '530026',
               isDefault: true
             }
           ]
-        };
+        });
 
-        loginUser(registeredUser);
-        addToast(`Account created & authenticated successfully! 🎉`, 'success');
+        loginUser(syncRes.user);
+        addToast(`Welcome to MANIVYA Enterprises, ${syncRes.user.name}! 🎉`, 'success');
         setIsAuthModalOpen(false);
-        return;
       } catch (err: any) {
-        // Fallback to local accounts if needed
-        console.warn('Backend register attempt:', err.message);
-      }
-
-      const accounts = getStoredAccounts();
-      const existing = accounts.find(a => a.username.toLowerCase() === cleanUsername);
-      if (existing) {
-        addToast(`Username "${cleanUsername}" is already taken. Please choose another or login.`, 'error');
-        return;
-      }
-
-      const newUser: User = {
-        id: `usr-${Date.now()}`,
-        name: name.trim() || cleanUsername,
-        email: email.trim() || `${cleanUsername}@manivya.com`,
-        phone: phone.trim() || '7207554777',
-        role: 'customer',
-        addresses: [
-          {
-            id: `addr-${Date.now()}`,
-            title: 'Home',
-            fullAddress: address.trim() || '25-1-13, Gajuwaka Bypass Road, Pedagantyada',
-            area: 'Visakhapatnam',
-            pincode: pincode.trim() || '530026',
-            isDefault: true
-          }
-        ],
-        createdAt: new Date().toISOString()
-      };
-
-      const newAccount: StoredAccount = {
-        username: cleanUsername,
-        password,
-        user: newUser
-      };
-
-      accounts.push(newAccount);
-      localStorage.setItem('manivya_accounts', JSON.stringify(accounts));
-
-      loginUser(newUser);
-      addToast(`Account "@${cleanUsername}" created successfully! 🎉`, 'success');
-      setIsAuthModalOpen(false);
-
-    } else {
-      // Login mode - try API first
-      try {
-        const userEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@manivya.com`;
-        const res = await api.userLogin(userEmail, password);
-        if (res.user) {
-          loginUser(res.user);
-          addToast(`Logged in successfully! 👋`, 'success');
-          setIsAuthModalOpen(false);
-          return;
+        let msg = err.message || 'Registration failed.';
+        if (err.code === 'auth/email-already-in-use') {
+          msg = 'An account with this email already exists. Please log in instead.';
+        } else if (err.code === 'auth/weak-password') {
+          msg = 'Password should be at least 6 characters.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Invalid email address.';
         }
-      } catch (err: any) {
-        console.warn('Backend login attempt:', err.message);
+        addToast(msg, 'error');
+      } finally {
+        setLoading(false);
       }
 
-      // Fallback local accounts check
-      const accounts = getStoredAccounts();
-      const account = accounts.find(
-        a => (a.username.toLowerCase() === cleanUsername || (a.user.email && a.user.email.toLowerCase() === cleanUsername)) && a.password === password
-      );
+    } else if (mode === 'login') {
+      // 2. Firebase Email/Password Login
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+        const fbUser = userCred.user;
+        const idToken = await fbUser.getIdToken();
 
-      if (account) {
-        loginUser(account.user);
-        addToast(`Logged in as @${account.username}! 👋`, 'success');
+        const syncRes = await api.firebaseLogin(idToken, {
+          uid: fbUser.uid,
+          name: fbUser.displayName || cleanEmail.split('@')[0],
+          email: cleanEmail,
+          provider: 'password',
+          emailVerified: fbUser.emailVerified
+        });
+
+        loginUser(syncRes.user);
+        addToast(`Welcome back, ${syncRes.user.name}! 👋`, 'success');
         setIsAuthModalOpen(false);
-      } else {
-        addToast('Invalid credentials. Please check your username/email and password.', 'error');
+      } catch (err: any) {
+        let msg = err.message || 'Login failed.';
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          msg = 'Incorrect password. Please try again or click Forgot Password.';
+        } else if (err.code === 'auth/user-not-found') {
+          msg = 'No account found with this email address. Please register.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Invalid email address format.';
+        }
+        addToast(msg, 'error');
+      } finally {
+        setLoading(false);
       }
     }
   };
 
+  if (!isAuthModalOpen) return null;
+
+  const isEmailVerified = auth.currentUser ? auth.currentUser.emailVerified : currentUser?.emailVerified;
+
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -257,29 +245,40 @@ export const AuthModal: React.FC = () => {
               <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-extrabold text-2xl flex items-center justify-center shadow-lg border border-blue-400/30 shrink-0">
-                      {currentUser.name.charAt(0).toUpperCase()}
-                    </div>
+                    {currentUser.photo ? (
+                      <img 
+                        src={currentUser.photo} 
+                        alt={currentUser.name} 
+                        referrerPolicy="no-referrer"
+                        className="w-13 h-13 rounded-2xl object-cover border border-blue-400/30 shadow-lg shrink-0" 
+                      />
+                    ) : (
+                      <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-extrabold text-2xl flex items-center justify-center shadow-lg border border-blue-400/30 shrink-0">
+                        {currentUser.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base font-extrabold text-white">{currentUser.name}</h3>
                         <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Active
+                          <CheckCircle2 className="w-3 h-3" /> {currentUser.role?.toUpperCase() || 'ACTIVE'}
                         </span>
                       </div>
                       <p className="text-xs text-blue-400 font-mono font-bold mt-0.5 break-all">
                         {currentUser.email}
                       </p>
-                      <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
-                        +{currentUser.phone}
-                      </p>
+                      {currentUser.phone && (
+                        <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                          +{currentUser.phone}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <button
                     onClick={() => {
                       setEditName(currentUser.name);
                       setEditEmail(currentUser.email);
-                      setEditPhone(currentUser.phone);
+                      setEditPhone(currentUser.phone || '');
                       setIsEditingProfile(!isEditingProfile);
                     }}
                     className="text-[11px] font-mono text-emerald-400 hover:underline font-bold shrink-0 self-start mt-0.5"
@@ -287,6 +286,23 @@ export const AuthModal: React.FC = () => {
                     {isEditingProfile ? 'Cancel' : 'Edit Profile'}
                   </button>
                 </div>
+
+                {/* Email Verification Banner */}
+                {auth.currentUser && !isEmailVerified && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                      <span>Email address unverified</span>
+                    </div>
+                    <button
+                      onClick={handleResendEmailVerification}
+                      disabled={isResendingVerification}
+                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-mono font-bold text-[10px] rounded-lg transition-all shrink-0 disabled:opacity-50"
+                    >
+                      {isResendingVerification ? 'Sending...' : 'Resend Email'}
+                    </button>
+                  </div>
+                )}
 
                 {isEditingProfile && (
                   <div className="pt-3 border-t border-zinc-800 space-y-2.5">
@@ -454,20 +470,65 @@ export const AuthModal: React.FC = () => {
                 </button>
               </div>
             </div>
+          ) : mode === 'forgot_password' ? (
+            /* Forgot Password Form */
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setMode('login')}
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-400 font-bold hover:underline mb-2"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Login
+                </button>
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-blue-400" /> Password Reset
+                </h2>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Enter your account's email address. We'll send you an official Firebase password reset link immediately.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <div className="flex items-center gap-2 mt-1 px-3 py-2.5 bg-zinc-950 rounded-xl border border-zinc-800 focus-within:border-blue-500">
+                  <Mail className="w-4 h-4 text-zinc-500" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. user@gmail.com"
+                    className="flex-1 bg-transparent text-sm outline-none text-white font-medium"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                <Send className="w-4 h-4" />
+                {loading ? 'Sending Reset Link...' : 'Send Password Reset Email'}
+              </button>
+            </form>
           ) : (
             /* Login or Signup Form */
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-mono font-bold mb-2">
-                  <KeyRound className="w-3.5 h-3.5" /> Account Authentication
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Firebase Authentication
                 </div>
                 <h2 className="text-xl font-black text-white">
-                  {isSignup ? 'Create MANIVYA Account' : 'Welcome Back - Login'}
+                  {mode === 'signup' ? 'Create Account' : 'Welcome Back - Login'}
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  {isSignup 
-                    ? 'Register with a unique username or sign in with Google to place orders' 
-                    : 'Sign in with Google or your username & password to track delivery'}
+                  {mode === 'signup' 
+                    ? 'Register with Firebase Auth to place orders and track delivery' 
+                    : 'Sign in with Google or your email & password'}
                 </p>
               </div>
 
@@ -489,26 +550,24 @@ export const AuthModal: React.FC = () => {
 
               <div className="flex items-center my-2">
                 <div className="flex-grow border-t border-zinc-800"></div>
-                <span className="shrink-0 mx-3 text-[10px] font-mono font-bold text-zinc-500 uppercase">OR WITH USERNAME</span>
+                <span className="shrink-0 mx-3 text-[10px] font-mono font-bold text-zinc-500 uppercase">OR WITH EMAIL & PASSWORD</span>
                 <div className="flex-grow border-t border-zinc-800"></div>
               </div>
 
-
-
               <div className="space-y-3">
-                {/* Username */}
+                {/* Email Address */}
                 <div>
                   <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
-                    Username <span className="text-red-400">*</span>
+                    Email Address <span className="text-red-400">*</span>
                   </label>
                   <div className="flex items-center gap-2 mt-1 px-3 py-2.5 bg-zinc-950 rounded-xl border border-zinc-800 focus-within:border-blue-500">
-                    <UserIcon className="w-4 h-4 text-zinc-500" />
+                    <Mail className="w-4 h-4 text-zinc-500" />
                     <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Enter your username"
-                      className="flex-1 bg-transparent text-sm outline-none text-white font-mono font-bold"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="flex-1 bg-transparent text-sm outline-none text-white font-medium"
                       required
                     />
                   </div>
@@ -516,9 +575,20 @@ export const AuthModal: React.FC = () => {
 
                 {/* Password */}
                 <div>
-                  <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
-                    Password <span className="text-red-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
+                      Password <span className="text-red-400">*</span>
+                    </label>
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => setMode('forgot_password')}
+                        className="text-[11px] text-blue-400 font-bold hover:underline"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1 px-3 py-2.5 bg-zinc-950 rounded-xl border border-zinc-800 focus-within:border-blue-500">
                     <KeyRound className="w-4 h-4 text-zinc-500" />
                     <input
@@ -533,7 +603,7 @@ export const AuthModal: React.FC = () => {
                 </div>
 
                 {/* Additional Register Fields */}
-                {isSignup && (
+                {mode === 'signup' && (
                   <>
                     <div>
                       <label className="text-xs font-mono font-bold text-zinc-400 uppercase">
@@ -579,7 +649,7 @@ export const AuthModal: React.FC = () => {
                           type="text"
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
-                          placeholder="Enter your Location"
+                          placeholder="Enter your Street / Door No."
                           className="flex-1 bg-transparent text-sm outline-none text-white font-medium"
                         />
                       </div>
@@ -590,18 +660,21 @@ export const AuthModal: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/20 transition-all mt-2"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/20 transition-all mt-2 disabled:opacity-60"
               >
-                {isSignup ? 'Create Account & Login' : 'Login to Account'}
+                {loading 
+                  ? 'Authenticating...' 
+                  : (mode === 'signup' ? 'Create Firebase Account' : 'Login with Firebase')}
               </button>
 
               <div className="text-center pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsSignup(!isSignup)}
+                  onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
                   className="text-xs text-blue-400 font-bold hover:underline"
                 >
-                  {isSignup ? 'Already registered? Click here to Login' : "Don't have an account? Create one now"}
+                  {mode === 'signup' ? 'Already registered? Click here to Login' : "Don't have an account? Create one now"}
                 </button>
               </div>
             </form>

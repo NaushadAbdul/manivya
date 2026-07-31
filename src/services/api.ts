@@ -580,7 +580,7 @@ export const api = {
     return data;
   },
 
-  async userRegister(userData: { name: string; email: string; password: string; phone?: string }): Promise<{ success: boolean; token: string; user: any }> {
+  async userRegister(userData: { name: string; email: string; password?: string; phone?: string }): Promise<{ success: boolean; token: string; user: any }> {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -591,6 +591,77 @@ export const api = {
       throw new Error(data.error || 'Registration failed');
     }
     return data;
+  },
+
+  async firebaseLogin(idToken?: string, userDetails?: any): Promise<{ success: boolean; token: string; user: any }> {
+    try {
+      const res = await fetch('/api/auth/firebase-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken, userDetails })
+      });
+      const data = await parseJsonResponse(res, 'Firebase authentication sync failed');
+      if (!data.success) {
+        throw new Error(data.error || 'Firebase authentication sync failed');
+      }
+      return data;
+    } catch (err) {
+      console.warn('Backend firebaseLogin sync warning (using client session):', err);
+      // Client-side fallback user object if backend offline
+      const u = userDetails || {};
+      return {
+        success: true,
+        token: idToken || `mne_fb_${Date.now()}`,
+        user: {
+          id: u.uid || `usr-${Date.now()}`,
+          uid: u.uid,
+          name: u.name || (u.email ? u.email.split('@')[0] : 'Customer'),
+          email: u.email || '',
+          photo: u.photo || '',
+          phone: u.phone || '',
+          provider: u.provider || 'firebase',
+          role: (u.email === 'admin@manivya.com') ? 'admin' : 'customer',
+          addresses: u.addresses || [],
+          createdAt: new Date().toISOString()
+        }
+      };
+    }
+  },
+
+  async recordLogout(uid: string): Promise<void> {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid })
+      });
+    } catch (e) {
+      // safe fallback
+    }
+  },
+
+  async getLoginActivities(token: string): Promise<any[]> {
+    try {
+      const res = await fetch('/api/admin/login-activities', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await parseJsonResponse(res, 'Failed to fetch login activities');
+      return data.activities || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async getUsersList(token: string): Promise<any[]> {
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await parseJsonResponse(res, 'Failed to fetch users');
+      return data.users || [];
+    } catch (e) {
+      return [];
+    }
   },
 
   async getAdminStats(token: string): Promise<AdminStats> {

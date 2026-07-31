@@ -445,67 +445,51 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         try {
-          const userDocRef = doc(db, 'users', fbUser.uid);
-          const userSnap = await getDoc(userDocRef);
-          
-          let appUser: User;
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            appUser = {
-              id: fbUser.uid,
-              name: data.displayName || fbUser.displayName || (fbUser.email ? formatNameFromEmail(fbUser.email) : 'Valued Customer'),
-              email: fbUser.email || '',
-              phone: data.phone || fbUser.phoneNumber || '',
-              role: data.role || 'customer',
-              addresses: data.addresses || [
-                {
-                  id: `addr-${fbUser.uid}`,
-                  title: 'Location Address',
-                  fullAddress: data.address || `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
-                  area: selectedLocation.area,
-                  pincode: data.pincode || selectedLocation.pincode,
-                  isDefault: true
-                }
-              ],
-              createdAt: data.createdAt || new Date().toISOString()
-            };
-          } else {
-            appUser = {
-              id: fbUser.uid,
-              name: fbUser.displayName || (fbUser.email ? formatNameFromEmail(fbUser.email) : 'Customer'),
-              email: fbUser.email || '',
-              phone: fbUser.phoneNumber || '',
-              role: 'customer',
-              addresses: [
-                {
-                  id: `addr-${fbUser.uid}`,
-                  title: 'Location Address',
-                  fullAddress: `${selectedLocation.area}, Visakhapatnam - ${selectedLocation.pincode}`,
-                  area: selectedLocation.area,
-                  pincode: selectedLocation.pincode,
-                  isDefault: true
-                }
-              ],
-              createdAt: new Date().toISOString()
-            };
+          const idToken = await fbUser.getIdToken();
+          const userDetails = {
+            uid: fbUser.uid,
+            name: fbUser.displayName || (fbUser.email ? formatNameFromEmail(fbUser.email) : 'Customer'),
+            email: fbUser.email || '',
+            photo: fbUser.photoURL || '',
+            phone: fbUser.phoneNumber || '',
+            provider: fbUser.providerData?.[0]?.providerId || 'firebase',
+            emailVerified: fbUser.emailVerified
+          };
+
+          // Sync user profile & login activity with MongoDB Atlas
+          const syncRes = await api.firebaseLogin(idToken, userDetails);
+          const appUser = syncRes.user;
+
+          // Also mirror to Firestore user document
+          try {
+            const userDocRef = doc(db, 'users', fbUser.uid);
             await setDoc(userDocRef, {
               userId: fbUser.uid,
               displayName: appUser.name,
               email: appUser.email,
-              phone: appUser.phone,
-              addresses: appUser.addresses,
-              role: 'customer',
-              createdAt: appUser.createdAt
+              photoURL: appUser.photo || '',
+              phone: appUser.phone || '',
+              role: appUser.role || 'customer',
+              addresses: appUser.addresses || [],
+              emailVerified: fbUser.emailVerified,
+              lastLogin: new Date().toISOString()
             }, { merge: true });
+          } catch (e) {
+            // silent Firestore write fallback
           }
+
           setCurrentUser(appUser);
           localStorage.setItem('manivya_user', JSON.stringify(appUser));
+          if (syncRes.token) {
+            localStorage.setItem('manivya_auth_token', syncRes.token);
+          }
         } catch (err) {
-          console.error('Firestore user sync error:', err);
+          console.error('Firebase Auth listener error:', err);
         }
       } else {
         setCurrentUser(null);
         localStorage.removeItem('manivya_user');
+        localStorage.removeItem('manivya_auth_token');
       }
     });
     return () => unsubscribe();
@@ -640,9 +624,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const logoutUser = () => {
+    if (currentUser?.uid || currentUser?.id) {
+      api.recordLogout(currentUser.uid || currentUser.id).catch(() => {});
+    }
     firebaseSignOut(auth).catch(() => {});
     setCurrentUser(null);
     localStorage.removeItem('manivya_user');
+    localStorage.removeItem('manivya_auth_token');
     addToast('Logged out successfully', 'info');
   };
 

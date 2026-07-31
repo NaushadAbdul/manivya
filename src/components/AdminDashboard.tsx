@@ -113,13 +113,19 @@ export const AdminDashboard: React.FC = () => {
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [isVerifyingToken, setIsVerifyingToken] = useState(true);
   const [isVerified, setIsVerified] = useState(false);
-  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'categories' | 'orders' | 'locations' | 'coupons' | 'database' | 'settings'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'categories' | 'orders' | 'locations' | 'coupons' | 'database' | 'users' | 'settings'>('analytics');
   const [stats, setStats] = useState<AdminStats | null>(null);
 
   // MongoDB Atlas State
   const [mongoStatus, setMongoStatus] = useState<any>(null);
   const [mongoInputUri, setMongoInputUri] = useState('');
   const [isTestingMongo, setIsTestingMongo] = useState(false);
+
+  // User Accounts & Login Activity State
+  const [userList, setUserList] = useState<any[]>([]);
+  const [loginActivities, setLoginActivities] = useState<any[]>([]);
+  const [isLoadingUserAudits, setIsLoadingUserAudits] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
 
   // Live Admin Token & Firebase Verification
   useEffect(() => {
@@ -166,6 +172,23 @@ export const AdminDashboard: React.FC = () => {
       setMongoStatus(res);
     } catch (e) {
       console.warn('MongoDB status fetch error:', e);
+    }
+  };
+
+  const fetchUsersAndActivities = async () => {
+    if (!adminToken) return;
+    setIsLoadingUserAudits(true);
+    try {
+      const [users, activities] = await Promise.all([
+        api.getUsersList(adminToken),
+        api.getLoginActivities(adminToken)
+      ]);
+      setUserList(users);
+      setLoginActivities(activities);
+    } catch (err) {
+      console.warn('Error fetching user audits:', err);
+    } finally {
+      setIsLoadingUserAudits(false);
     }
   };
 
@@ -761,6 +784,18 @@ export const AdminDashboard: React.FC = () => {
                   {mongoStatus?.isConnected && (
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
                   )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('users');
+                    fetchUsersAndActivities();
+                  }}
+                  className={`p-2.5 rounded-xl flex items-center gap-2 transition-all ${
+                    activeTab === 'users' ? 'bg-blue-600 text-white font-black' : 'text-zinc-400 hover:bg-zinc-900'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-blue-400" /> User Accounts & Audits
                 </button>
               </div>
 
@@ -2180,6 +2215,237 @@ export const AdminDashboard: React.FC = () => {
                       </ul>
                     </div>
 
+                  </div>
+                )}
+
+                {/* Users & Activity Audits Tab */}
+                {activeTab === 'users' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-4">
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-mono font-bold mb-1">
+                          <Users className="w-3 h-3" /> MongoDB Atlas & Firebase Auth Audit
+                        </div>
+                        <h2 className="text-xl font-black text-white tracking-tight">
+                          User Accounts & Interaction Audits
+                        </h2>
+                        <p className="text-xs text-zinc-400">
+                          Track customer interactions, payments, cancelled orders, total purchases, and IP/Device login records.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={fetchUsersAndActivities}
+                        disabled={isLoadingUserAudits}
+                        className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-mono font-bold flex items-center gap-2 transition-all self-start sm:self-auto"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingUserAudits ? 'animate-spin text-blue-400' : ''}`} />
+                        <span>Refresh Audits</span>
+                      </button>
+                    </div>
+
+                    {/* Stats Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                        <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Total Registered Users</p>
+                        <p className="text-2xl font-black text-white mt-1">{userList.length}</p>
+                        <p className="text-[10px] font-mono text-emerald-400 mt-1">MongoDB User Records</p>
+                      </div>
+
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                        <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Google Auth Users</p>
+                        <p className="text-2xl font-black text-blue-400 mt-1">
+                          {userList.filter(u => u.provider?.includes('google')).length}
+                        </p>
+                        <p className="text-[10px] font-mono text-zinc-400 mt-1">Google OAuth Provider</p>
+                      </div>
+
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                        <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Login Sessions Recorded</p>
+                        <p className="text-2xl font-black text-emerald-400 mt-1">{loginActivities.length}</p>
+                        <p className="text-[10px] font-mono text-zinc-400 mt-1">IP & Device Audit Logs</p>
+                      </div>
+
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl">
+                        <p className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Active Customers</p>
+                        <p className="text-2xl font-black text-purple-400 mt-1">
+                          {userList.filter(u => u.role === 'customer').length}
+                        </p>
+                        <p className="text-[10px] font-mono text-zinc-400 mt-1">Customer Accounts</p>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="flex items-center gap-2 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl">
+                      <Search className="w-4 h-4 text-zinc-500 shrink-0" />
+                      <input
+                        type="text"
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                        placeholder="Search users by name, email, phone, IP, or UID..."
+                        className="w-full bg-transparent text-xs text-white outline-none placeholder:text-zinc-600 font-medium"
+                      />
+                    </div>
+
+                    {/* Registered Users Section */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-bold text-zinc-200 font-mono uppercase tracking-wider flex items-center gap-2">
+                        <User className="w-4 h-4 text-blue-400" />
+                        <span>Registered User Accounts ({userList.length})</span>
+                      </h3>
+
+                      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden overflow-x-auto">
+                        <table className="w-full text-left text-xs text-zinc-300">
+                          <thead className="bg-zinc-900 border-b border-zinc-800 font-mono text-[10px] uppercase text-zinc-400">
+                            <tr>
+                              <th className="px-4 py-3 font-bold">User / Profile</th>
+                              <th className="px-4 py-3 font-bold">Email Address</th>
+                              <th className="px-4 py-3 font-bold">Role</th>
+                              <th className="px-4 py-3 font-bold">Auth Provider</th>
+                              <th className="px-4 py-3 font-bold">Orders Placed</th>
+                              <th className="px-4 py-3 font-bold">Total Spent</th>
+                              <th className="px-4 py-3 font-bold">Registered Date</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-900 font-mono">
+                            {userList.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500 text-xs">
+                                  No user accounts found in MongoDB Atlas. Accounts will appear automatically as users register or log in with Firebase.
+                                </td>
+                              </tr>
+                            ) : (
+                              userList
+                                .filter(u => {
+                                  if (!userSearchTerm.trim()) return true;
+                                  const q = userSearchTerm.toLowerCase();
+                                  return (
+                                    (u.name && u.name.toLowerCase().includes(q)) ||
+                                    (u.email && u.email.toLowerCase().includes(q)) ||
+                                    (u.uid && u.uid.toLowerCase().includes(q))
+                                  );
+                                })
+                                .map((u) => {
+                                  const userOrders = allOrders.filter(o => o.customerEmail?.toLowerCase() === u.email?.toLowerCase());
+                                  const totalSpent = userOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+                                  return (
+                                    <tr key={u.id || u.uid} className="hover:bg-zinc-900/50 transition-colors">
+                                      <td className="px-4 py-3 font-bold text-white flex items-center gap-2.5">
+                                        {u.photo ? (
+                                          <img src={u.photo} alt={u.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
+                                        ) : (
+                                          <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold flex items-center justify-center text-xs shrink-0">
+                                            {(u.name || 'U').charAt(0).toUpperCase()}
+                                          </div>
+                                        )}
+                                        <div>
+                                          <p className="text-xs font-bold text-white">{u.name || 'Anonymous User'}</p>
+                                          <p className="text-[10px] text-zinc-500 font-mono">UID: {u.uid?.slice(0, 12)}...</p>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 text-blue-400 font-bold">{u.email}</td>
+                                      <td className="px-4 py-3">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                          u.role === 'admin' 
+                                            ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300' 
+                                            : 'bg-zinc-800 text-zinc-300'
+                                        }`}>
+                                          {u.role?.toUpperCase() || 'CUSTOMER'}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span className="px-2 py-0.5 rounded-lg bg-zinc-900 border border-zinc-800 text-[10px] text-emerald-400 font-bold">
+                                          {u.provider || 'firebase'}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 font-bold text-white">{userOrders.length} orders</td>
+                                      <td className="px-4 py-3 font-bold text-emerald-400">₹{totalSpent.toLocaleString()}</td>
+                                      <td className="px-4 py-3 text-zinc-400 text-[11px]">
+                                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : 'Recent'}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Live Interaction & Login Audit Trail */}
+                    <div className="space-y-3 pt-4 border-t border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-zinc-200 font-mono uppercase tracking-wider flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-emerald-400" />
+                          <span>User Login & Interaction Audit Logs ({loginActivities.length})</span>
+                        </h3>
+                        <span className="text-[10px] font-mono text-zinc-500">Live Client IP & Device Tracking</span>
+                      </div>
+
+                      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden overflow-x-auto">
+                        <table className="w-full text-left text-xs text-zinc-300">
+                          <thead className="bg-zinc-900 border-b border-zinc-800 font-mono text-[10px] uppercase text-zinc-400">
+                            <tr>
+                              <th className="px-4 py-3 font-bold">User Name</th>
+                              <th className="px-4 py-3 font-bold">Email</th>
+                              <th className="px-4 py-3 font-bold">Auth Provider</th>
+                              <th className="px-4 py-3 font-bold">Client IP Address</th>
+                              <th className="px-4 py-3 font-bold">Device & OS</th>
+                              <th className="px-4 py-3 font-bold">Browser</th>
+                              <th className="px-4 py-3 font-bold">Login Timestamp</th>
+                              <th className="px-4 py-3 font-bold">Logout / Session</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-900 font-mono">
+                            {loginActivities.length === 0 ? (
+                              <tr>
+                                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500 text-xs">
+                                  No login activities recorded yet. Login attempts will automatically record client IP, OS, browser, and login timestamps in MongoDB Atlas.
+                                </td>
+                              </tr>
+                            ) : (
+                              loginActivities
+                                .filter(a => {
+                                  if (!userSearchTerm.trim()) return true;
+                                  const q = userSearchTerm.toLowerCase();
+                                  return (
+                                    (a.name && a.name.toLowerCase().includes(q)) ||
+                                    (a.email && a.email.toLowerCase().includes(q)) ||
+                                    (a.ip && a.ip.toLowerCase().includes(q))
+                                  );
+                                })
+                                .map((act, i) => (
+                                  <tr key={act._id || i} className="hover:bg-zinc-900/50 transition-colors">
+                                    <td className="px-4 py-3 font-bold text-white">{act.name || 'User'}</td>
+                                    <td className="px-4 py-3 text-blue-400">{act.email}</td>
+                                    <td className="px-4 py-3">
+                                      <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-emerald-400 font-bold text-[10px]">
+                                        {act.provider || 'google'}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-bold text-amber-300 font-mono">{act.ip || 'Cloud Ingress IP'}</td>
+                                    <td className="px-4 py-3 text-zinc-300">{act.device || 'Desktop'} ({act.os || 'Linux'})</td>
+                                    <td className="px-4 py-3 text-zinc-400">{act.browser || 'Chrome'}</td>
+                                    <td className="px-4 py-3 text-zinc-300 text-[11px]">
+                                      {act.loginTime ? new Date(act.loginTime).toLocaleString('en-IN') : 'Just now'}
+                                    </td>
+                                    <td className="px-4 py-3 text-[11px]">
+                                      {act.logoutTime ? (
+                                        <span className="text-zinc-500">{new Date(act.logoutTime).toLocaleTimeString('en-IN')} (Logged out)</span>
+                                      ) : (
+                                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" /> Active Session
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 )}
 

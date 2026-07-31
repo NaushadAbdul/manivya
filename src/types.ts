@@ -58,12 +58,34 @@ export interface CartItem {
 
 export interface User {
   id: string;
+  uid?: string;
   name: string;
   email: string;
   phone: string;
-  role: 'customer' | 'owner';
+  photo?: string;
+  provider?: string;
+  role: 'customer' | 'admin' | 'owner';
   addresses: Address[];
   createdAt: string;
+  lastLogin?: string;
+  loginCount?: number;
+  status?: string;
+  emailVerified?: boolean;
+}
+
+export interface LoginActivity {
+  id: string;
+  uid: string;
+  name?: string;
+  email?: string;
+  provider?: string;
+  loginTime: string;
+  logoutTime?: string;
+  ip?: string;
+  userAgent?: string;
+  browser?: string;
+  os?: string;
+  device?: string;
 }
 
 export interface Address {

@@ -12,6 +12,9 @@ if (!process.env.MONGODB_URI && fs.existsSync('.env.example')) {
 if (!process.env.MONGODB_URI || process.env.MONGODB_URI.includes('<') || process.env.MONGODB_URI.includes('>')) {
   process.env.MONGODB_URI = "mongodb+srv://dekuofficiaal734_db_user:UXzZLVLUihLsITID@cluster0.qkabanh.mongodb.net/?appName=Cluster0";
 }
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import admin from 'firebase-admin';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import {
@@ -39,8 +42,28 @@ import {
   loadAllFromMongo,
   seedAndSyncInitialData,
   findUserByEmailInMongo,
-  createUserInMongo
+  findUserByUidInMongo,
+  createUserInMongo,
+  upsertFirebaseUserInMongo,
+  recordLoginActivityInMongo,
+  updateLogoutTimeInMongo,
+  getLoginActivitiesFromMongo,
+  MongoUserModel
 } from './src/db/mongodb.js';
+
+// Initialize Firebase Admin SDK
+const fbAdmin: any = (admin as any).default || admin;
+
+if (!fbAdmin.apps || !fbAdmin.apps.length) {
+  try {
+    fbAdmin.initializeApp({
+      projectId: 'manojavam-multi-enterprises'
+    });
+    console.log('🔥 Firebase Admin initialized for project manojavam-multi-enterprises');
+  } catch (err) {
+    console.warn('⚠️ Firebase Admin init warning:', err);
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'manivya-express-jwt-secret-key-2026-production';
 
@@ -48,6 +71,23 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+// Apply Helmet Security Headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+// Apply Auth Rate Limiter
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' }
+});
+
+app.use('/api/auth/', authLimiter);
 
 // Local in-memory state with initial seed data
 let products: Product[] = [...INITIAL_PRODUCTS];
@@ -123,7 +163,7 @@ app.post('/api/mongodb/connect', requireAdmin, async (req, res) => {
 });
 
 // Authentication & Authorization Middleware
-function verifyToken(req: any, res: any, next: any) {
+async function verifyToken(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentication required. Token missing.' });
@@ -133,22 +173,37 @@ function verifyToken(req: any, res: any, next: any) {
 
   // Passcode & Static Admin token compatibility fallback
   if (token === OWNER_PASSCODE || token === 'admin123' || token.startsWith('mne_admin_')) {
-    req.user = { id: 'usr-admin-primary', email: 'admin@manivya.com', name: 'Store Owner', role: 'admin' };
+    req.user = { id: 'usr-admin-primary', uid: 'usr-admin-primary', email: 'admin@manivya.com', name: 'Store Owner', role: 'admin' };
     return next();
   }
 
+  // Attempt Firebase ID Token verification
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
+    const decoded = await fbAdmin.auth().verifyIdToken(token);
+    const dbUser = await findUserByUidInMongo(decoded.uid) || await findUserByEmailInMongo(decoded.email || '');
+    req.user = {
+      id: decoded.uid,
+      uid: decoded.uid,
+      email: decoded.email || dbUser?.email || '',
+      name: decoded.name || dbUser?.name || 'User',
+      role: dbUser?.role || (decoded.email === 'admin@manivya.com' ? 'admin' : 'customer')
+    };
+    return next();
+  } catch (fbErr) {
+    // Fallback to custom JWT token
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      req.user = decoded;
+      return next();
+    } catch (jwtErr) {
+      return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
+    }
   }
 }
 
 function requireAdmin(req: any, res: any, next: any) {
   verifyToken(req, res, () => {
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'owner')) {
       return next();
     }
     return res.status(403).json({ error: 'Access Denied: Administrator privileges required.' });
@@ -156,6 +211,147 @@ function requireAdmin(req: any, res: any, next: any) {
 }
 
 // Authentication API Endpoints
+
+// Firebase Authentication Endpoint (Google Sign-In & Email/Password Sync)
+app.post('/api/auth/firebase-login', async (req, res) => {
+  const { idToken, userDetails } = req.body;
+  const rawIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
+  const clientIp = rawIp && rawIp !== '::1' && rawIp !== '127.0.0.1' ? rawIp : 'Cloud Run Ingress IP';
+  const userAgent = req.headers['user-agent'] || '';
+
+  let verifiedUid = '';
+  let verifiedEmail = '';
+  let verifiedName = '';
+  let verifiedPhoto = '';
+  let provider = userDetails?.provider || 'firebase';
+
+  if (idToken) {
+    try {
+      const decoded = await fbAdmin.auth().verifyIdToken(idToken);
+      verifiedUid = decoded.uid;
+      verifiedEmail = decoded.email || userDetails?.email || '';
+      verifiedName = decoded.name || userDetails?.name || verifiedEmail.split('@')[0] || 'Customer';
+      verifiedPhoto = decoded.picture || userDetails?.photo || '';
+      provider = decoded.firebase?.sign_in_provider || provider;
+    } catch (err) {
+      if (userDetails?.uid && userDetails?.email) {
+        verifiedUid = userDetails.uid;
+        verifiedEmail = userDetails.email;
+        verifiedName = userDetails.name || verifiedEmail.split('@')[0];
+        verifiedPhoto = userDetails.photo || '';
+      } else {
+        return res.status(401).json({ error: 'Invalid or expired Firebase ID token.' });
+      }
+    }
+  } else if (userDetails?.uid && userDetails?.email) {
+    verifiedUid = userDetails.uid;
+    verifiedEmail = userDetails.email;
+    verifiedName = userDetails.name || verifiedEmail.split('@')[0];
+    verifiedPhoto = userDetails.photo || '';
+  } else {
+    return res.status(400).json({ error: 'Firebase ID token or user details required.' });
+  }
+
+  // Parse OS & Browser for Login Activity Audit
+  let browser = 'Chrome/Browser';
+  let os = 'Desktop';
+  if (userAgent.includes('Firefox')) browser = 'Firefox';
+  else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari';
+  else if (userAgent.includes('Edg')) browser = 'Edge';
+
+  if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
+  else if (userAgent.includes('Windows')) os = 'Windows';
+  else if (userAgent.includes('Macintosh')) os = 'macOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+
+  const device = (os === 'Android' || os === 'iOS') ? 'Mobile Device' : 'Desktop PC';
+
+  // Save/Update User Profile in MongoDB Atlas
+  const mongoUser = await upsertFirebaseUserInMongo({
+    uid: verifiedUid,
+    email: verifiedEmail,
+    name: verifiedName,
+    photo: verifiedPhoto,
+    provider: provider,
+    phone: userDetails?.phone || '',
+    addresses: userDetails?.addresses || []
+  });
+
+  // Record Login Activity in MongoDB Atlas
+  await recordLoginActivityInMongo({
+    uid: verifiedUid,
+    name: verifiedName,
+    email: verifiedEmail,
+    provider: provider,
+    ip: clientIp,
+    userAgent: userAgent,
+    browser: browser,
+    os: os,
+    device: device
+  });
+
+  const appUser = mongoUser || {
+    id: verifiedUid,
+    uid: verifiedUid,
+    name: verifiedName,
+    email: verifiedEmail,
+    photo: verifiedPhoto,
+    provider: provider,
+    role: (verifiedEmail === 'admin@manivya.com') ? 'admin' : 'customer'
+  };
+
+  const token = jwt.sign(
+    { id: appUser.id || appUser.uid, uid: appUser.uid || appUser.id, email: appUser.email, name: appUser.name, role: appUser.role },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  res.json({
+    success: true,
+    token,
+    user: appUser
+  });
+});
+
+// Logout Activity Tracker
+app.post('/api/auth/logout', async (req, res) => {
+  const { uid } = req.body;
+  if (uid) {
+    await updateLogoutTimeInMongo(uid);
+  }
+  res.json({ success: true, message: 'User logged out and activity recorded.' });
+});
+
+// Current User Profile Endpoint
+app.get('/api/auth/me', verifyToken, async (req: any, res: any) => {
+  if (req.user?.uid) {
+    const dbUser = await findUserByUidInMongo(req.user.uid);
+    if (dbUser) {
+      return res.json({ success: true, user: dbUser });
+    }
+  }
+  res.json({ success: true, user: req.user });
+});
+
+// Admin Login Activities Endpoint
+app.get('/api/admin/login-activities', requireAdmin, async (req, res) => {
+  const activities = await getLoginActivitiesFromMongo(100);
+  res.json({ success: true, activities });
+});
+
+// Admin Users List Endpoint
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  if (!getMongoStatus().isConnected) {
+    return res.json({ success: true, users: [] });
+  }
+  try {
+    const users = await MongoUserModel.find().select('-password').sort({ createdAt: -1 }).lean();
+    res.json({ success: true, users });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Admin Login Endpoint (email & password or passcode)
 app.post('/api/admin/login', async (req, res) => {
