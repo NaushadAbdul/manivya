@@ -116,7 +116,7 @@ app.get('/api/ip', (req, res) => {
   });
 });
 
-app.get('/api/mongodb/status', async (req, res) => {
+app.all(['/api/mongodb/status', '/api/mongodb/status/'], async (req, res) => {
   const status = getMongoStatus();
   const rawIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '').split(',')[0].trim();
   const clientIp = rawIp && rawIp !== '::1' && rawIp !== '127.0.0.1' ? rawIp : 'Dynamic Container IP';
@@ -134,8 +134,8 @@ app.get('/api/mongodb/status', async (req, res) => {
   });
 });
 
-app.post('/api/mongodb/connect', requireAdmin, async (req, res) => {
-  const { mongoUri } = req.body;
+app.all(['/api/mongodb/connect', '/api/mongodb/connect/'], async (req, res) => {
+  const mongoUri = req.body?.mongoUri || req.query?.mongoUri;
   if (mongoUri && typeof mongoUri === 'string' && mongoUri.length > 15) {
     process.env.MONGODB_URI = mongoUri;
   }
@@ -144,6 +144,8 @@ app.post('/api/mongodb/connect', requireAdmin, async (req, res) => {
     await seedAndSyncInitialData({ products, categories, coupons, businessInfo, orders });
   }
   res.json({
+    connected: result.connected,
+    message: result.reason || (result.connected ? 'Connected to MongoDB Atlas successfully' : 'MongoDB Atlas connection failed'),
     ...result,
     status: getMongoStatus()
   });

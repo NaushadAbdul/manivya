@@ -169,6 +169,13 @@ export const Footer: React.FC = () => {
               Customer Support
             </p>
             <div className="space-y-2">
+              <a
+                href="/manivya-dashboard"
+                className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center justify-between transition-all"
+              >
+                <span>Open Admin Panel</span>
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </a>
               <button
                 onClick={() => setIsAIAssistantOpen(true)}
                 className="w-full py-2 px-3 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-bold flex items-center justify-between transition-all"

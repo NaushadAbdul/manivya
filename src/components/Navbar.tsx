@@ -10,7 +10,8 @@ import {
   PackageCheck, 
   User as UserIcon,
   ChevronDown,
-  PhoneCall
+  PhoneCall,
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -157,6 +158,16 @@ export const Navbar: React.FC = () => {
                 </span>
               )}
             </button>
+
+            {/* Admin Dashboard Link */}
+            <a
+              href="/manivya-dashboard"
+              className="hidden lg:flex p-2.5 sm:px-3 sm:py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold items-center gap-1.5 transition-colors"
+              title="Open Admin Dashboard & MongoDB Control"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Admin Panel</span>
+            </a>
 
             {/* Orders Modal (Desktop/Tablet) */}
             <button
